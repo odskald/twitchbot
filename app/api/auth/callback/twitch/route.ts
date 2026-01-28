@@ -18,11 +18,13 @@ export async function GET(req: NextRequest) {
   }
 
   const config = await getGlobalConfig();
-  if (!config.twitchClientId || !config.twitchClientSecret || !config.appBaseUrl) {
+  if (!config.twitchClientId || !config.twitchClientSecret) {
     return NextResponse.json({ error: "Server misconfiguration (missing keys)" }, { status: 500 });
   }
 
-  const redirectUri = `${config.appBaseUrl}/api/auth/callback/twitch`;
+  // Use dynamic origin to match the login request
+  const baseUrl = req.nextUrl.origin;
+  const redirectUri = `${baseUrl}/api/auth/callback/twitch`;
 
   try {
     // Exchange code for tokens
@@ -75,7 +77,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Redirect back to settings with success
-    return NextResponse.redirect(`${config.appBaseUrl}/settings?connected=true`);
+    return NextResponse.redirect(`${baseUrl}/settings?connected=true`);
   } catch (err: any) {
     console.error("Auth callback error:", err);
     return NextResponse.json({ error: "Internal Server Error", message: err.message }, { status: 500 });

@@ -4,14 +4,17 @@ import { getGlobalConfig } from "@/lib/config";
 export async function GET(req: NextRequest) {
   const config = await getGlobalConfig();
 
-  if (!config.twitchClientId || !config.appBaseUrl) {
+  if (!config.twitchClientId) {
     return NextResponse.json(
-      { error: "Missing Client ID or Base URL in settings" },
+      { error: "Missing Client ID in settings" },
       { status: 400 }
     );
   }
 
-  const redirectUri = `${config.appBaseUrl}/api/auth/callback/twitch`;
+  // Use the current request's origin to ensure we redirect back to the same domain
+  // This fixes issues where the DB config might have "localhost" but the user is on Vercel
+  const baseUrl = req.nextUrl.origin;
+  const redirectUri = `${baseUrl}/api/auth/callback/twitch`;
   const scopes = [
     "moderator:read:chatters", // Required to see who is in chat
     "user:read:chat",         // General chat read access
