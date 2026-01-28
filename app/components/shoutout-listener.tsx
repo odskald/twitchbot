@@ -24,9 +24,22 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   // Keep track of preferred voice for logging purposes (even if we use Google TTS now)
   const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
+  // Check for silent mode (Visuals Only)
+  const [isSilentMode, setIsSilentMode] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('silent') === 'true') {
+            setIsSilentMode(true);
+            setAudioEnabled(true); // Auto-enable visuals since no audio is needed
+        }
+    }
+  }, []);
+
   const addLog = (msg: string) => {
-      console.log(msg);
-      setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5 logs
+    setLogs(prev => [...prev.slice(-4), `[${new Date().toLocaleTimeString()}] ${msg}`]);
+    console.log(`[ShoutoutDebug] ${msg}`);
   };
 
   const enableAudio = () => {
@@ -148,6 +161,13 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   };
 
   const speak = (text: string, onStart: () => void, onEnd: () => void) => {
+    if (isSilentMode) {
+        addLog("Silent Mode -> Skipping Audio");
+        onStart();
+        setTimeout(onEnd, 3000); // Show for 3s then hide
+        return;
+    }
+
     // HYBRID IMPLEMENTATION: Google TTS -> Browser TTS Fallback
     
     // 1. Truncate text to 200 chars
