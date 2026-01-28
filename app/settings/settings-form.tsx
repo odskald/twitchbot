@@ -94,7 +94,13 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
   );
 }
 
-function FormGroup({ label, name, type = "text", defaultValue, placeholder }: any) {
+function FormGroup({ label, name, defaultValue, placeholder, type = "text" }: { 
+  label: string, 
+  name: string, 
+  defaultValue: string, 
+  placeholder: string,
+  type?: string
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <label style={{ fontWeight: 500 }}>{label}</label>

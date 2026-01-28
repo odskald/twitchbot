@@ -1,11 +1,12 @@
 import React from "react";
 import Link from "next/link";
 import prisma from "@/lib/db";
+import { getLiveChatters } from "@/lib/twitch-api";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const [channelsCount, usersCount, recentUsers] = await Promise.all([
+  const [channelsCount, usersCount, recentUsers, liveChatters] = await Promise.all([
     prisma.channel.count(),
     prisma.user.count(),
     prisma.user.findMany({
@@ -16,13 +17,15 @@ export default async function Page() {
           select: { points: true }
         }
       }
-    })
+    }),
+    getLiveChatters()
   ]);
 
   const botStatus = {
     health: "ok",
     channelsTracked: channelsCount,
     usersKnown: usersCount,
+    liveViewers: liveChatters.count
   };
 
   return (
@@ -36,14 +39,45 @@ export default async function Page() {
             gap: 16,
           }}
         >
-          <Card title="Health" value={botStatus.health} />
+          <Card title="Live Chatters (Helix)" value={String(botStatus.liveViewers)} />
+          <Card title="Users in DB" value={String(botStatus.usersKnown)} />
           <Card title="Channels tracked" value={String(botStatus.channelsTracked)} />
-          <Card title="Users known" value={String(botStatus.usersKnown)} />
         </div>
       </section>
 
+      {/* Live Chatters Section */}
       <section style={{ marginTop: 32 }}>
-        <h3>Recently Active Users</h3>
+        <h3>Live Chatters (Connected to Chat)</h3>
+        {liveChatters.chatters.length === 0 ? (
+          <div style={{ padding: 16, background: "rgba(255, 255, 255, 0.05)", borderRadius: 8 }}>
+            <p style={{ margin: 0, color: "#a7abb9" }}>
+              No chatters detected or bot not authenticated. 
+              Ensure you have <Link href="/settings" style={{ color: "#7aa2f7" }}>connected the bot account</Link> in settings.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {liveChatters.chatters.map((chatter) => (
+              <span 
+                key={chatter.user_id}
+                style={{
+                  background: "#1a1b26",
+                  border: "1px solid #24283b",
+                  padding: "4px 12px",
+                  borderRadius: 16,
+                  fontSize: 14,
+                  color: "#c0caf5"
+                }}
+              >
+                {chatter.user_name}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section style={{ marginTop: 32 }}>
+        <h3>Recently Active Users (Database)</h3>
         {recentUsers.length === 0 ? (
           <p style={{ color: "#a7abb9" }}>No users tracked yet. Waiting for events...</p>
         ) : (

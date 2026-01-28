@@ -70,5 +70,10 @@ model GlobalConfig {
   twitchWebhookSecret String?
   appBaseUrl          String?
   twitchChannel       String?
+  accessToken         String?
+  refreshToken        String?
+  tokenExpiresAt      DateTime?
+  botUserId           String?
+  botUserName         String?
   updatedAt           DateTime @updatedAt
 }
