@@ -425,7 +425,7 @@ export async function subscribeToChatEvents(baseUrl: string): Promise<boolean> {
             },
             transport: {
                 method: "webhook",
-                callback: `${baseUrl}/api/webhooks/twitch`,
+                callback: `${baseUrl.replace(/\/$/, "")}/api/webhooks/twitch`,
                 secret: config.twitchWebhookSecret
             }
         })
