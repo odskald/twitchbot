@@ -5,7 +5,6 @@ export default async function Page() {
   // Simple status placeholders; could be populated from DB in future
   const botStatus = {
     health: "ok",
-    lastCronTick: "unknown",
     channelsTracked: 0,
     usersKnown: 0,
   };
@@ -22,7 +21,6 @@ export default async function Page() {
           }}
         >
           <Card title="Health" value={botStatus.health} />
-          <Card title="Last cron tick" value={botStatus.lastCronTick} />
           <Card title="Channels tracked" value={String(botStatus.channelsTracked)} />
           <Card title="Users known" value={String(botStatus.usersKnown)} />
         </div>
@@ -33,9 +31,6 @@ export default async function Page() {
         <ul>
           <li>
             <Link href="/api/health">Health endpoint</Link>
-          </li>
-          <li>
-            <Link href="/api/cron/tick">Cron tick endpoint</Link>
           </li>
         </ul>
       </section>

@@ -56,13 +56,9 @@ model PointLedger {
 model Settings {
   id                 String    @id @default(cuid())
   channelId          String    @unique
-  lurkPointsPerTick  Int       @default(1)
-  tickIntervalMinutes Int      @default(5)
   webhooksEnabled    Boolean   @default(true)
-  lastCronTick       DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  // Relations
   channel            Channel   @relation(fields: [channelId], references: [id])
 }

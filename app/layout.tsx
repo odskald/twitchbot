@@ -25,7 +25,7 @@ export default function RootLayout({
           <header style={{ marginBottom: 24 }}>
             <h1 style={{ margin: 0 }}>Twitch Lurker Bot</h1>
             <p style={{ margin: "4px 0 0 0", color: "#a7abb9" }}>
-              Serverless EventSub + Cron, Prisma + Neon Postgres
+              Serverless EventSub, Prisma + Neon Postgres
             </p>
           </header>
           <main>{children}</main>
