@@ -1,0 +1,68 @@
+// Prisma schema for Twitch lurker bot
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TransactionType {
+  AWARD
+  DEDUCT
+}
+
+model User {
+  id           String         @id @default(cuid())
+  twitchId     String         @unique
+  displayName  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  pointLedger  PointLedger[]
+}
+
+model Channel {
+  id           String         @id @default(cuid())
+  twitchId     String         @unique
+  name         String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  pointLedger  PointLedger[]
+  settings     Settings?
+}
+
+model PointLedger {
+  id           String           @id @default(cuid())
+  userId       String
+  channelId    String
+  points       Int
+  type         TransactionType
+  reason       String?
+  createdAt    DateTime         @default(now())
+
+  // Relations
+  user         User             @relation(fields: [userId], references: [id])
+  channel      Channel          @relation(fields: [channelId], references: [id])
+
+  @@index([userId, channelId, createdAt])
+}
+
+model Settings {
+  id                 String    @id @default(cuid())
+  channelId          String    @unique
+  lurkPointsPerTick  Int       @default(1)
+  tickIntervalMinutes Int      @default(5)
+  webhooksEnabled    Boolean   @default(true)
+  lastCronTick       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  channel            Channel   @relation(fields: [channelId], references: [id])
+}
