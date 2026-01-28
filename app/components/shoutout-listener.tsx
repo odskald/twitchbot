@@ -154,56 +154,6 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const safeText = text.substring(0, 200);
     const encodedText = encodeURIComponent(safeText);
     
-    // 2. Fetch StreamElements TTS (Robust & Free)
-    // Voice "Vitoria" is a high-quality Portuguese voice
-    const url = `https://api.streamelements.com/kappa/v2/speech?voice=Vitoria&text=${encodedText}`;
-    addLog(`Fetching TTS (StreamElements)...`);
-    fetch(url)
-        .then(async (response) => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            
-            addLog("TTS Fetched -> Playing");
-            const audio = new Audio(blobUrl);
-            audio.volume = 1.0;
-            
-            // Cleanup blob URL when done
-            audio.onended = () => {
-                addLog("StreamElements TTS Finished");
-                URL.revokeObjectURL(blobUrl);
-                onEnd();
-            };
-
-            audio.onerror = (e) => {
-                const errorType = e instanceof Event ? e.type : String(e);
-                addLog(`StreamElements TTS Play Error: [${errorType}]`);
-                URL.revokeObjectURL(blobUrl);
-                fallbackToBrowserTTS();
-            };
-
-            // Play
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    addLog(`StreamElements TTS Blocked: ${error.message}`);
-                    URL.revokeObjectURL(blobUrl);
-                    fallbackToBrowserTTS();
-                });
-            }
-            
-            // Signal start immediately on play
-            audio.onplay = () => {
-                addLog("StreamElements TTS Playing 🔊");
-                hasStarted = true;
-                onStart();
-            };
-        })
-        .catch(err => {
-            addLog(`StreamElements Fetch Failed: ${err.message}`);
-            fallbackToBrowserTTS();
-        });
-
     let hasStarted = false;
     let fallbackTriggered = false;
 
@@ -211,7 +161,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const fallbackToBrowserTTS = () => {
         if (fallbackTriggered) return;
         fallbackTriggered = true;
-        addLog("Google TTS Failed -> Falling back to Browser TTS");
+        addLog("Remote TTS Failed -> Falling back to Browser TTS");
 
         if (!window.speechSynthesis) {
             addLog("Browser TTS not supported");
@@ -255,19 +205,80 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
 
         window.speechSynthesis.speak(utterance);
     };
-    // -----------------------
+    
+    // --- SECONDARY FALLBACK: GOOGLE (client=tw-ob) ---
+    const playGoogleFallback = () => {
+        addLog("Trying Secondary TTS (Google)...");
+        const googleUrl = `https://translate.googleapis.com/translate_tts?client=tw-ob&ie=UTF-8&tl=pt-BR&q=${encodedText}`;
+        const audio = new Audio(googleUrl);
+        audio.volume = 1.0;
+        
+        audio.onplay = () => {
+            addLog("Google TTS Playing 🔊");
+            hasStarted = true;
+            onStart();
+        };
+        
+        audio.onended = () => {
+            addLog("Google TTS Finished");
+            onEnd();
+        };
+        
+        audio.onerror = (e) => {
+            addLog(`Google TTS Failed: ${e.type}`);
+            fallbackToBrowserTTS();
+        };
+        
+        audio.play().catch(e => {
+            addLog(`Google TTS Blocked: ${e.message}`);
+            fallbackToBrowserTTS();
+        });
+    };
+
+    // 1. Try StreamElements (Direct Audio, No Fetch)
+    // Voice "Vitoria" is a high-quality Portuguese voice
+    const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Vitoria&text=${encodedText}`;
+    addLog(`Playing TTS (StreamElements)...`);
+    
+    const audio = new Audio(seUrl);
+    audio.volume = 1.0;
+
+    audio.onplay = () => {
+        addLog("StreamElements TTS Playing 🔊");
+        hasStarted = true;
+        onStart();
+    };
+
+    audio.onended = () => {
+        addLog("StreamElements TTS Finished");
+        onEnd();
+    };
+
+    audio.onerror = (e) => {
+        const errorType = e instanceof Event ? e.type : String(e);
+        addLog(`StreamElements Error: [${errorType}]`);
+        playGoogleFallback();
+    };
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            addLog(`StreamElements Blocked: ${error.message}`);
+            playGoogleFallback();
+        });
+    }
 
     // Safety fallback
     setTimeout(() => {
         if (!hasStarted && !fallbackTriggered) {
             addLog("Timeout -> Trying Fallback");
-            fallbackToBrowserTTS();
+            playGoogleFallback();
         } else if (!hasStarted && fallbackTriggered) {
              addLog("Final Timeout -> Visuals Only");
              hasStarted = true;
              onStart();
         }
-    }, 2000);
+    }, 2500);
   };
 
   return (
