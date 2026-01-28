@@ -212,12 +212,31 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
                 xpToAdd = minutes * 3;     
                 shouldUpdateTimestamp = true;
               } else if (diffMs > MAX_LURK_GAP_MS) {
+                // Gap too large (new session), just reset timestamp
                 shouldUpdateTimestamp = true;
               }
             } else {
+              // New user, just create
               shouldUpdateTimestamp = true;
             }
 
+            // Optimization: Skip DB write if nothing changed
+            // We only write if:
+            // 1. It's a new user (!dbUser)
+            // 2. Points/XP were awarded (pointsToAdd > 0)
+            // 3. We need to reset timestamp (shouldUpdateTimestamp - usually means gap > MAX or points awarded)
+            // 4. Name changed (dbUser.displayName !== chatter.user_name)
+            
+            const nameChanged = dbUser && dbUser.displayName !== chatter.user_name;
+            const hasProgress = pointsToAdd > 0 || xpToAdd > 0;
+            
+            // If existing user AND no progress AND no timestamp update needed AND name hasn't changed
+            // THEN SKIP to prevent updating 'updatedAt' prematurely
+            if (dbUser && !hasProgress && !shouldUpdateTimestamp && !nameChanged) {
+              return; 
+            }
+
+            // Calculate new stats
             const currentXp = (dbUser?.xp || 0) + xpToAdd;
             const currentPoints = (dbUser?.points || 0) + pointsToAdd;
             const { level } = calculateLevel(currentXp);
