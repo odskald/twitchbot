@@ -98,7 +98,7 @@ export async function getTwitchUserId(username: string): Promise<string | null> 
 /**
  * Fetches the current list of chatters for the configured channel.
  */
-export async function getLiveChatters(): Promise<{ count: number; chatters: Chatter[] }> {
+export async function getLiveChatters(): Promise<{ count: number; chatters: Chatter[]; error?: string }> {
   const token = await getValidAccessToken();
   const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
 
