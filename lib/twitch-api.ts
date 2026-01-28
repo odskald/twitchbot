@@ -1,5 +1,6 @@
 import { getGlobalConfig } from "./config";
 import prisma from "./db";
+import { calculateLevel } from "./leveling";
 
 // Types
 export interface TwitchUser {
@@ -163,24 +164,77 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
           create: { twitchId: broadcasterId, name: targetChannelName }
         });
 
-        // 2. Upsert Users (Batch or Loop)
-        // We must update 'updatedAt' to track "last seen"
-        await Promise.all(enrichedChatters.map((chatter: Chatter) => 
-          prisma.user.upsert({
+        // 2. Upsert Users & Award Points/XP
+        // We track 'updatedAt' to calculate time spent since last check.
+        const now = new Date();
+        const MAX_LURK_GAP_MS = 10 * 60 * 1000; // 10 minutes max gap to award points (prevents huge jumps if bot was off)
+        const MIN_LURK_GAP_MS = 60 * 1000;      // 1 minute minimum to award points
+
+        // Fetch existing users first to check their last seen time
+        const userIds = enrichedChatters.map(c => c.user_id);
+        const existingUsers = await prisma.user.findMany({
+          where: { twitchId: { in: userIds } }
+        });
+        const existingUserMap = new Map(existingUsers.map(u => [u.twitchId, u]));
+
+        await Promise.all(enrichedChatters.map(async (chatter: Chatter) => {
+          const dbUser = existingUserMap.get(chatter.user_id);
+          
+          let pointsToAdd = 0;
+          let xpToAdd = 0;
+          let shouldUpdateTimestamp = false;
+
+          if (dbUser) {
+            const diffMs = now.getTime() - dbUser.updatedAt.getTime();
+            
+            // Only award if within valid window (active session)
+            if (diffMs >= MIN_LURK_GAP_MS && diffMs <= MAX_LURK_GAP_MS) {
+              const minutes = Math.floor(diffMs / 60000);
+              pointsToAdd = minutes * 1; // 1 point per minute
+              xpToAdd = minutes * 3;     // 3 XP per minute
+              shouldUpdateTimestamp = true;
+            } else if (diffMs > MAX_LURK_GAP_MS) {
+              // Gap too large (new session), just reset timestamp
+              shouldUpdateTimestamp = true;
+            }
+          } else {
+            // New user, just create
+            shouldUpdateTimestamp = true;
+          }
+
+          // Calculate new stats
+          const currentXp = (dbUser?.xp || 0) + xpToAdd;
+          const currentPoints = (dbUser?.points || 0) + pointsToAdd;
+          const { level } = calculateLevel(currentXp);
+
+          // Perform Upsert
+          // If we are awarding points, we update 'updatedAt' to 'now' to consume the time.
+          // If we are NOT awarding (diff < 1 min), we keep old 'updatedAt' so time accumulates.
+          // UNLESS it's a new user or a stale session, then we force update.
+          const updateData: any = {
+            displayName: chatter.user_name,
+            points: currentPoints,
+            xp: currentXp,
+            level: level
+          };
+
+          if (shouldUpdateTimestamp) {
+            updateData.updatedAt = now;
+          }
+
+          await prisma.user.upsert({
             where: { twitchId: chatter.user_id },
-            update: { 
-              displayName: chatter.user_name,
-              updatedAt: new Date()
-            },
+            update: updateData,
             create: {
               twitchId: chatter.user_id,
               displayName: chatter.user_name,
               points: 0,
               level: 1,
-              xp: 0
+              xp: 0,
+              updatedAt: now
             }
-          })
-        ));
+          });
+        }));
 
         // 3. Fetch Enriched Data (Points, Level, XP)
         const userIds = enrichedChatters.map(c => c.user_id);
