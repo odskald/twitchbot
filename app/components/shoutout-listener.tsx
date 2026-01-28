@@ -155,6 +155,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const encodedText = encodeURIComponent(safeText);
     
     // 2. Fetch Google TTS Blob (Bypass direct streaming issues in OBS)
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=pt-BR&q=${encodedText}`;
     addLog(`Fetching TTS (Google)...`);
     fetch(url)
         .then(async (response) => {
