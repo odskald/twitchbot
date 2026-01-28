@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   const scopes = [
     "moderator:read:chatters", // Required to see who is in chat
     "user:read:chat",         // General chat read access
-    "user:bot",               // Marks this user as a bot (optional but good)
+    "chat:read",              // IRC chat read
+    "chat:edit",              // IRC chat write
   ].join(" ");
 
   const twitchAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${config.twitchClientId}&redirect_uri=${encodeURIComponent(
