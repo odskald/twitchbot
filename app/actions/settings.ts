@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { subscribeToChatEvents } from "@/lib/twitch-api";
 
 export async function updateGlobalConfig(prevState: any, formData: FormData) {
   const twitchClientId = formData.get("twitchClientId") as string;
@@ -37,5 +38,25 @@ export async function updateGlobalConfig(prevState: any, formData: FormData) {
   } catch (error) {
     console.error("Failed to save settings:", error);
     return { success: false, message: "Failed to save settings to database." };
+  }
+}
+
+export async function subscribeToChat(prevState: any, formData: FormData) {
+  try {
+    const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+    if (!config?.appBaseUrl) {
+        return { success: false, message: "Base URL is not set in settings." };
+    }
+
+    const success = await subscribeToChatEvents(config.appBaseUrl);
+    
+    if (success) {
+        return { success: true, message: "Successfully subscribed to chat events!" };
+    } else {
+        return { success: false, message: "Failed to subscribe. Check server logs." };
+    }
+  } catch (error) {
+    console.error("Subscribe error:", error);
+    return { success: false, message: "Internal error during subscription." };
   }
 }

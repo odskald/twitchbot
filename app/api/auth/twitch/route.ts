@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
   const scopes = [
     "moderator:read:chatters", // Required to see who is in chat
     "user:read:chat",         // General chat read access
+    "user:write:chat",        // General chat write access (Helix)
     "chat:read",              // IRC chat read
     "chat:edit",              // IRC chat write
   ].join(" ");

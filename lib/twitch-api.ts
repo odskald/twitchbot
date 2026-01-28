@@ -303,3 +303,110 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
     return { count: 0, chatters: [], error: `Internal Error: ${error.message}` };
   }
 }
+
+/**
+ * Sends a chat message to the channel.
+ */
+export async function sendChatMessage(message: string): Promise<boolean> {
+  const token = await getValidAccessToken();
+  const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+
+  if (!token || !config?.twitchClientId || !config?.botUserId) {
+    console.error("Cannot send message: Missing configuration");
+    return false;
+  }
+
+  // Determine target channel ID
+  const targetChannelName = config.twitchChannel || config.botUserName;
+  let broadcasterId = config.botUserId; // Default to bot's own channel
+
+  if (targetChannelName && targetChannelName.toLowerCase() !== config.botUserName?.toLowerCase()) {
+     const resolvedId = await getTwitchUserId(targetChannelName);
+     if (resolvedId) broadcasterId = resolvedId;
+  }
+
+  try {
+    const response = await fetch("https://api.twitch.tv/helix/chat/messages", {
+        method: "POST",
+        headers: {
+            "Client-ID": config.twitchClientId,
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            broadcaster_id: broadcasterId,
+            sender_id: config.botUserId,
+            message: message
+        })
+    });
+
+    if (!response.ok) {
+        console.error("Failed to send chat message:", await response.text());
+        return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error sending chat message:", error);
+    return false;
+  }
+}
+
+/**
+ * Subscribes to chat message events via EventSub Webhook.
+ */
+export async function subscribeToChatEvents(baseUrl: string): Promise<boolean> {
+   const token = await getValidAccessToken();
+   const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+
+   if (!token || !config?.twitchClientId || !config?.botUserId || !config?.twitchWebhookSecret) {
+     console.error("Cannot subscribe: Missing config or webhook secret");
+     return false;
+   }
+
+   // Determine broadcaster ID
+   const targetChannelName = config.twitchChannel || config.botUserName;
+   let broadcasterId = config.botUserId;
+   if (targetChannelName && targetChannelName.toLowerCase() !== config.botUserName?.toLowerCase()) {
+      const resolvedId = await getTwitchUserId(targetChannelName);
+      if (resolvedId) broadcasterId = resolvedId;
+   }
+
+   try {
+     const response = await fetch("https://api.twitch.tv/helix/eventsub/subscriptions", {
+        method: "POST",
+        headers: {
+             "Client-ID": config.twitchClientId,
+             "Authorization": `Bearer ${token}`,
+             "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            type: "channel.chat.message",
+            version: "1",
+            condition: {
+                broadcaster_user_id: broadcasterId,
+                user_id: config.botUserId 
+            },
+            transport: {
+                method: "webhook",
+                callback: `${baseUrl}/api/webhooks/twitch`,
+                secret: config.twitchWebhookSecret
+            }
+        })
+     });
+
+     if (!response.ok) {
+        // If already subscribed, it might return 409 or 400. 
+        // 409 Conflict: Subscription already exists. This is fine.
+        if (response.status === 409) return true;
+        
+        const text = await response.text();
+        console.error("Failed to subscribe to chat events:", text);
+        return false;
+     }
+     
+     return true;
+   } catch (error) {
+     console.error("Error subscribing to chat events:", error);
+     return false;
+   }
+}

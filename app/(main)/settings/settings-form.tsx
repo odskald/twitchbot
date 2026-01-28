@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { updateGlobalConfig } from "@/app/actions/settings";
+import { updateGlobalConfig, subscribeToChat } from "@/app/actions/settings";
 
 const initialState = {
   message: "",
@@ -30,6 +30,57 @@ function SubmitButton() {
       {pending ? "Saving..." : "Save Settings"}
     </button>
   );
+}
+
+function ChatSubscriptionButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      style={{
+        background: pending ? "#1f2937" : "#8b5cf6",
+        color: "white",
+        border: "none",
+        padding: "8px 16px",
+        borderRadius: 6,
+        cursor: pending ? "not-allowed" : "pointer",
+        fontWeight: 600,
+        fontSize: 14,
+      }}
+    >
+      {pending ? "Subscribing..." : "Enable Chat Commands"}
+    </button>
+  );
+}
+
+function ChatSubscriptionSection() {
+    const [state, formAction] = useFormState(subscribeToChat, initialState);
+
+    return (
+        <form action={formAction} style={{ marginTop: 32, padding: 16, border: "1px solid #24283b", borderRadius: 8, background: "#1a1b26" }}>
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>Chat Integration</h3>
+          <p style={{ fontSize: 14, color: "#a7abb9", marginBottom: 16 }}>
+            Enable the bot to listen to chat commands (e.g. !pontos). This registers a Webhook with Twitch.
+            Ensure "Base URL" and "Webhook Secret" are saved above first!
+          </p>
+          
+          {state?.message && (
+            <div style={{ 
+              marginBottom: 16,
+              padding: 12, 
+              borderRadius: 6, 
+              background: state.success ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+              color: state.success ? "#34d399" : "#f87171",
+              border: `1px solid ${state.success ? "#059669" : "#b91c1c"}`
+            }}>
+              {state.success ? "✅ " : "❌ "}{state.message}
+            </div>
+          )}
+    
+          <ChatSubscriptionButton />
+        </form>
+    );
 }
 
 export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: any }) {
@@ -109,6 +160,8 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
         <SubmitButton />
       </div>
     </form>
+    
+    <ChatSubscriptionSection />
     </div>
   );
 }
