@@ -147,6 +147,41 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
     }
 
     const data = await response.json();
+    
+    // START LURKING: Track these users in the database
+    // We do this asynchronously to not block the UI response too much, 
+    // but in Server Actions/Components we should ideally await it or use a queue.
+    // Given the constraints, we'll await it to ensure data consistency.
+    if (data.data && data.data.length > 0) {
+      try {
+        // 1. Ensure Channel Exists
+        await prisma.channel.upsert({
+          where: { twitchId: broadcasterId },
+          update: { name: targetChannelName },
+          create: { twitchId: broadcasterId, name: targetChannelName }
+        });
+
+        // 2. Upsert Users (Batch or Loop)
+        // Prisma doesn't support "upsertMany" natively for SQLite/Postgres in the same way,
+        // but we can use transaction or just Promise.all for now (limit 100 is small enough).
+        await Promise.all(data.data.map((chatter: Chatter) => 
+          prisma.user.upsert({
+            where: { twitchId: chatter.user_id },
+            update: { 
+              displayName: chatter.user_name,
+              updatedAt: new Date() // Updates 'last seen' effectively
+            },
+            create: {
+              twitchId: chatter.user_id,
+              displayName: chatter.user_name
+            }
+          })
+        ));
+      } catch (dbError) {
+        console.error("Failed to track chatters in DB:", dbError);
+      }
+    }
+
     return {
       count: data.total,
       chatters: data.data, // List of { user_id, user_login, user_name }
