@@ -235,7 +235,6 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
       {currentShoutout && (
       <div style={{
         position: 'fixed',
-        position: 'fixed',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
@@ -280,6 +279,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
           }
         `}</style>
       </div>
+      )}
     </>
   );
 }
