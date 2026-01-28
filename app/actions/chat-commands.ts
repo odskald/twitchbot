@@ -63,33 +63,57 @@ export async function processChatCommand(
     
     // Command: !shop
     else if (lowerCommand === '!shop') {
-        // Check if there are any items in the DB
+        // Simplified Shop for now
         const items = await prisma.shopItem.findMany({
           where: { isEnabled: true },
           orderBy: { cost: 'asc' }
         });
+        
+        let msg = `@${chatterName}, use !msg <message> (100 pts) to send a highlighted message!`;
+        
+        if (items.length > 0) {
+            const itemsList = items.map(i => `${i.name} (${i.cost} pts)`).join(', ');
+            msg += ` Other items: ${itemsList}. Use !buy <item_name>.`;
+        }
+        
+        await sendChatMessage(msg);
+    }
+    
+    // Command: !msg <message>
+    else if (lowerCommand === '!msg') {
+        const messageContent = args.join(' ').trim();
+        const MSG_COST = 100;
+        
+        if (!messageContent) {
+            await sendChatMessage(`@${chatterName}, usage: !msg <your_message> (Cost: ${MSG_COST} pts)`);
+            return;
+        }
 
-        // If no items, seed some defaults so the user sees something immediately
-        if (items.length === 0) {
-           await prisma.shopItem.createMany({
-             data: [
-               { name: "Hydrate", cost: 100, description: "Remind streamer to drink water" },
-               { name: "Posture Check", cost: 200, description: "Sit up straight!" },
-               { name: "Shoutout", cost: 500, description: "Get a shoutout" },
-               { name: "VIP (24h)", cost: 5000, description: "VIP status for a day" }
-             ]
-           });
-           // Re-fetch
-           const seededItems = await prisma.shopItem.findMany({
-             where: { isEnabled: true },
-             orderBy: { cost: 'asc' }
-           });
-           
-           const itemsList = seededItems.map((i: any) => `${i.name} (${i.cost} pts)`).join(', ');
-           await sendChatMessage(`@${chatterName}, available items: ${itemsList}. Use !buy <item_name> to purchase.`);
+        const user = await prisma.user.findUnique({
+            where: { twitchId: chatterId }
+        });
+
+        if (!user || user.points < MSG_COST) {
+            await sendChatMessage(`@${chatterName}, you need ${MSG_COST} points to use !msg. You have ${user?.points || 0}.`);
         } else {
-           const itemsList = items.map(i => `${i.name} (${i.cost} pts)`).join(', ');
-           await sendChatMessage(`@${chatterName}, available items: ${itemsList}. Use !buy <item_name> to purchase.`);
+             // Transact
+             await prisma.$transaction([
+                prisma.user.update({
+                  where: { twitchId: chatterId },
+                  data: { points: { decrement: MSG_COST } }
+                }),
+                prisma.pointLedger.create({
+                  data: {
+                      userId: user.id,
+                      points: -MSG_COST,
+                      type: 'SPEND',
+                      reason: `Used !msg: ${messageContent}`
+                  }
+                })
+              ]);
+              
+              // Echo the message
+              await sendChatMessage(`[100 pts] @${chatterName} says: ${messageContent}`);
         }
     }
 
