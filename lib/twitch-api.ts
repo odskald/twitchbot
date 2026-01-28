@@ -102,15 +102,27 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
   const token = await getValidAccessToken();
   const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
 
-  if (!token || !config?.twitchClientId || !config?.twitchChannel || !config?.botUserId) {
-    console.warn("Cannot fetch chatters: Missing token, channel, or bot ID.");
+  if (!token || !config?.twitchClientId || !config?.botUserId) {
+    console.warn("Cannot fetch chatters: Missing token or bot ID.");
     return { count: 0, chatters: [] };
   }
 
-  // We need the Broadcaster ID (Channel ID)
-  // Ideally this should be stored, but let's fetch/resolve it if needed.
-  // For now, let's assume we can resolve it quickly.
-  const broadcasterId = await getTwitchUserId(config.twitchChannel);
+  // Determine target channel: Explicit config > Bot's own channel
+  const targetChannelName = config.twitchChannel || config.botUserName;
+
+  if (!targetChannelName) {
+    console.warn("Cannot fetch chatters: No channel configured and no bot user known.");
+    return { count: 0, chatters: [] };
+  }
+
+  // Optimize: If target is bot, use botUserId
+  let broadcasterId: string | null = null;
+  if (config.botUserName && targetChannelName.toLowerCase() === config.botUserName.toLowerCase()) {
+    broadcasterId = config.botUserId;
+  } else {
+    broadcasterId = await getTwitchUserId(targetChannelName);
+  }
+
   if (!broadcasterId) {
     return { count: 0, chatters: [] };
   }

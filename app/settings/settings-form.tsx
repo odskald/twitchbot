@@ -81,11 +81,11 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
       />
 
       <FormGroup 
-        label="Twitch Channel Name" 
-        name="twitchChannel" 
-        defaultValue={dbConfig?.twitchChannel || ""} 
-        placeholder="e.g. ninja (The channel to watch)"
-      />
+          label="Twitch Channel Name" 
+          name="twitchChannel" 
+          defaultValue={dbConfig?.twitchChannel || ""} 
+          placeholder={dbConfig?.botUserName ? `Defaults to ${dbConfig.botUserName}` : "e.g. ninja (The channel to watch)"}
+        />
 
       <div style={{ marginTop: 16 }}>
         <SubmitButton />
