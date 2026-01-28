@@ -244,9 +244,8 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             onEnd();
         };
 
-        audio.onerror = (e) => {
-            const target = e.target as HTMLAudioElement;
-            const err = target.error;
+        audio.onerror = () => {
+            const err = audio.error;
             addLog(`SE Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
             playGoogleTTS(); // Fallback
         };
@@ -277,9 +276,8 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             onEnd();
         };
         
-        audio.onerror = (e) => {
-            const target = e.target as HTMLAudioElement;
-            const err = target.error;
+        audio.onerror = () => {
+            const err = audio.error;
             addLog(`Google Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
             fallbackToBrowserTTS();
         };
