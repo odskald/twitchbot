@@ -28,11 +28,25 @@ export default async function Page() {
 
       <section style={{ marginTop: 24 }}>
         <h3>Utilities</h3>
-        <ul>
+        <ul style={{ marginBottom: 24 }}>
           <li>
             <Link href="/api/health">Health endpoint</Link>
           </li>
         </ul>
+        <Link 
+          href="/settings"
+          style={{
+            display: "inline-block",
+            background: "#24283b",
+            color: "white",
+            textDecoration: "none",
+            padding: "8px 16px",
+            borderRadius: 6,
+            fontSize: 14
+          }}
+        >
+          ⚙️ Open Settings
+        </Link>
       </section>
     </div>
   );

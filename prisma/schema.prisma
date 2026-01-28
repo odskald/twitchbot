@@ -62,3 +62,12 @@ model Settings {
 
   channel            Channel   @relation(fields: [channelId], references: [id])
 }
+
+model GlobalConfig {
+  id                  String   @id @default("default")
+  twitchClientId      String?
+  twitchClientSecret  String?
+  twitchWebhookSecret String?
+  appBaseUrl          String?
+  updatedAt           DateTime @updatedAt
+}
