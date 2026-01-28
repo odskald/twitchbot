@@ -146,7 +146,10 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     utterance.rate = 0.8; // Slower speed
     utterance.pitch = 1;
     
+    let hasStarted = false;
+
     utterance.onstart = () => {
+        hasStarted = true;
         onStart();
     };
 
@@ -157,11 +160,20 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     utterance.onerror = (e) => {
         console.error("TTS Error", e);
         // Ensure we don't stall the queue on error
-        onStart(); 
+        if (!hasStarted) onStart(); 
         onEnd();
     };
 
     window.speechSynthesis.speak(utterance);
+
+    // Safety fallback: if onstart doesn't fire within 500ms (e.g. OBS audio blocked), force show visuals
+    setTimeout(() => {
+        if (!hasStarted) {
+            console.warn("TTS onstart timed out, forcing visuals");
+            hasStarted = true;
+            onStart();
+        }
+    }, 500);
   };
 
   if (!currentShoutout) return null;
