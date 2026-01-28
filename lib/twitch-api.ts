@@ -390,14 +390,14 @@ async function getAppAccessToken(): Promise<string | null> {
 /**
  * Subscribes to chat message events via EventSub Webhook.
  */
-export async function subscribeToChatEvents(baseUrl: string): Promise<boolean> {
+export async function subscribeToChatEvents(baseUrl: string): Promise<{ success: boolean; error?: string }> {
    // specific for Webhook subscriptions, we need an App Access Token
    const token = await getAppAccessToken();
    const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
 
    if (!token || !config?.twitchClientId || !config?.botUserId || !config?.twitchWebhookSecret) {
      console.error("Cannot subscribe: Missing config or webhook secret");
-     return false;
+     return { success: false, error: "Missing config or webhook secret" };
    }
 
    // Determine broadcaster ID
@@ -434,16 +434,14 @@ export async function subscribeToChatEvents(baseUrl: string): Promise<boolean> {
      if (!response.ok) {
         // If already subscribed, it might return 409 or 400. 
         // 409 Conflict: Subscription already exists. This is fine.
-        if (response.status === 409) return true;
-        
+        if (response.status === 409) return { success: true };
         const text = await response.text();
         console.error("Failed to subscribe to chat events:", text);
-        return false;
+        return { success: false, error: text };
      }
-     
-     return true;
-   } catch (error) {
+     return { success: true };
+   } catch (error: any) {
      console.error("Error subscribing to chat events:", error);
-     return false;
+     return { success: false, error: error.message };
    }
 }

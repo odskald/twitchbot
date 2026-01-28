@@ -48,15 +48,16 @@ export async function subscribeToChat(prevState: any, formData: FormData) {
         return { success: false, message: "Base URL is not set in settings." };
     }
 
-    const success = await subscribeToChatEvents(config.appBaseUrl);
+    const result = await subscribeToChatEvents(config.appBaseUrl);
     
-    if (success) {
+    if (result.success) {
         return { success: true, message: "Successfully subscribed to chat events!" };
     } else {
-        return { success: false, message: "Failed to subscribe. Check server logs." };
+        // Return the actual error message so the client can see it
+        return { success: false, message: `Failed: ${result.error}` };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Subscribe error:", error);
-    return { success: false, message: "Internal error during subscription." };
+    return { success: false, message: `Internal error: ${error.message}` };
   }
 }
