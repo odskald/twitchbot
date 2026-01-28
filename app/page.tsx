@@ -48,6 +48,10 @@ export default async function Page() {
           ⚙️ Open Settings
         </Link>
       </section>
+
+      <footer style={{ marginTop: 64, borderTop: "1px solid #24283b", paddingTop: 24, color: "#565f89", fontSize: 12 }}>
+        <p>Twitch Lurker Bot v1.0.1 • Running on Vercel</p>
+      </footer>
     </div>
   );
 }
