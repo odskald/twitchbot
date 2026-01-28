@@ -80,6 +80,13 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
         placeholder={envFlags.hasBaseUrl ? "(Set in Env)" : "https://your-app.vercel.app"}
       />
 
+      <FormGroup 
+        label="Twitch Channel Name" 
+        name="twitchChannel" 
+        defaultValue={dbConfig?.twitchChannel || ""} 
+        placeholder="e.g. ninja (The channel to watch)"
+      />
+
       <div style={{ marginTop: 16 }}>
         <SubmitButton />
       </div>

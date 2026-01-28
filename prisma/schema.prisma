@@ -69,5 +69,6 @@ model GlobalConfig {
   twitchClientSecret  String?
   twitchWebhookSecret String?
   appBaseUrl          String?
+  twitchChannel       String?
   updatedAt           DateTime @updatedAt
 }

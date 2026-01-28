@@ -8,6 +8,7 @@ export async function updateGlobalConfig(prevState: any, formData: FormData) {
   const twitchClientSecret = formData.get("twitchClientSecret") as string;
   const twitchWebhookSecret = formData.get("twitchWebhookSecret") as string;
   const appBaseUrl = formData.get("appBaseUrl") as string;
+  const twitchChannel = formData.get("twitchChannel") as string;
 
   try {
     await prisma.globalConfig.upsert({
@@ -17,6 +18,7 @@ export async function updateGlobalConfig(prevState: any, formData: FormData) {
         twitchClientSecret,
         twitchWebhookSecret,
         appBaseUrl,
+        twitchChannel,
       },
       create: {
         id: "default",
@@ -24,6 +26,7 @@ export async function updateGlobalConfig(prevState: any, formData: FormData) {
         twitchClientSecret,
         twitchWebhookSecret,
         appBaseUrl,
+        twitchChannel,
       },
     });
 
