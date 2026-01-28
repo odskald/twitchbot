@@ -18,6 +18,9 @@ export default async function LeaderboardPage() {
   });
 
   return (
-    <LeaderboardDisplay topPoints={topPoints} topLevel={topLevel} />
+    <>
+      <AutoRefresh intervalMs={5000} />
+      <LeaderboardDisplay topPoints={topPoints} topLevel={topLevel} />
+    </>
   );
 }
