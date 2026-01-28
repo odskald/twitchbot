@@ -1,12 +1,28 @@
 import React from "react";
 import Link from "next/link";
+import prisma from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  // Simple status placeholders; could be populated from DB in future
+  const [channelsCount, usersCount, recentUsers] = await Promise.all([
+    prisma.channel.count(),
+    prisma.user.count(),
+    prisma.user.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+      include: {
+        pointLedger: {
+          select: { points: true }
+        }
+      }
+    })
+  ]);
+
   const botStatus = {
     health: "ok",
-    channelsTracked: 0,
-    usersKnown: 0,
+    channelsTracked: channelsCount,
+    usersKnown: usersCount,
   };
 
   return (
@@ -16,7 +32,7 @@ export default async function Page() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 16,
           }}
         >
@@ -24,6 +40,41 @@ export default async function Page() {
           <Card title="Channels tracked" value={String(botStatus.channelsTracked)} />
           <Card title="Users known" value={String(botStatus.usersKnown)} />
         </div>
+      </section>
+
+      <section style={{ marginTop: 32 }}>
+        <h3>Recently Active Users</h3>
+        {recentUsers.length === 0 ? (
+          <p style={{ color: "#a7abb9" }}>No users tracked yet. Waiting for events...</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #24283b" }}>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Twitch ID</th>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Display Name</th>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Last Seen</th>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentUsers.map((user) => {
+                  const totalPoints = user.pointLedger.reduce((acc, curr) => acc + curr.points, 0);
+                  return (
+                    <tr key={user.id} style={{ borderBottom: "1px solid #1a1b26" }}>
+                      <td style={{ padding: "12px 8px" }}>{user.twitchId}</td>
+                      <td style={{ padding: "12px 8px", fontWeight: 500 }}>{user.displayName || "-"}</td>
+                      <td style={{ padding: "12px 8px", color: "#a7abb9" }}>
+                        {new Date(user.updatedAt).toLocaleDateString()} {new Date(user.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td style={{ padding: "12px 8px" }}>{totalPoints}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section style={{ marginTop: 24 }}>
