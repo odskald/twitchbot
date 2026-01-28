@@ -1,82 +1,37 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
+import prisma from "@/lib/db";
+import { getLiveChatters } from "@/lib/twitch-api";
+import AutoRefresh from "@/app/components/auto-refresh";
 
-interface Chatter {
-  user_id: string;
-  user_name: string;
-  points?: number;
-  level?: number;
-  xp?: number;
-}
+export const dynamic = "force-dynamic";
 
-interface DashboardData {
-  channelsCount: number;
-  usersCount: number;
-  liveChatters: {
-    count: number;
-    chatters: Chatter[];
-    error?: string;
-  };
-}
-
-export default function Page() {
-  const [data, setData] = useState<DashboardData | null>(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch("/api/stats/dashboard");
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
+export default async function Page() {
+  const [channelsCount, usersCount, recentUsers, liveChatters] = await Promise.all([
+    prisma.channel.count(),
+    prisma.user.count(),
+    prisma.user.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+      include: {
+        pointLedger: {
+          select: { points: true }
         }
-      } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
       }
-    };
-
-    fetchData(); // Initial fetch
-    const interval = setInterval(fetchData, 10000); // Poll every 10s
-
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!data) {
-    return <div style={{ color: "#a7abb9", padding: 20 }}>Loading dashboard stats...</div>;
-  }
-
-  const { channelsCount, usersCount, liveChatters } = data;
+    }),
+    getLiveChatters()
+  ]);
 
   const botStatus = {
+    health: "ok",
     channelsTracked: channelsCount,
     usersKnown: usersCount,
     liveViewers: liveChatters.count
   };
 
-  function Card({ title, value }: { title: string; value: string }) {
-    return (
-      <div
-        style={{
-          background: "#1a1b26",
-          padding: 24,
-          borderRadius: 12,
-          border: "1px solid #24283b",
-        }}
-      >
-        <h3 style={{ margin: "0 0 8px 0", fontSize: 14, color: "#a9b1d6" }}>
-          {title}
-        </h3>
-        <p style={{ margin: 0, fontSize: 24, fontWeight: "bold", color: "#c0caf5" }}>
-          {value}
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div>
+      <AutoRefresh intervalMs={30000} />
       <section>
         <h2>Bot status</h2>
         <div
@@ -140,6 +95,84 @@ export default function Page() {
           </div>
         )}
       </section>
+
+      <section style={{ marginTop: 32 }}>
+        <h3>Recently Active Users (Database)</h3>
+        {recentUsers.length === 0 ? (
+          <p style={{ color: "#a7abb9" }}>No users tracked yet. Waiting for events...</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #24283b" }}>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Twitch ID</th>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Display Name</th>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Last Seen</th>
+                  <th style={{ padding: "12px 8px", color: "#a7abb9" }}>Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentUsers.map((user) => {
+                  const totalPoints = user.pointLedger.reduce((acc, curr) => acc + curr.points, 0);
+                  return (
+                    <tr key={user.id} style={{ borderBottom: "1px solid #1a1b26" }}>
+                      <td style={{ padding: "12px 8px" }}>{user.twitchId}</td>
+                      <td style={{ padding: "12px 8px", fontWeight: 500 }}>{user.displayName || "-"}</td>
+                      <td style={{ padding: "12px 8px", color: "#a7abb9" }}>
+                        {new Date(user.updatedAt).toLocaleDateString()} {new Date(user.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td style={{ padding: "12px 8px" }}>{totalPoints}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section style={{ marginTop: 24 }}>
+        <h3>Utilities</h3>
+        <ul style={{ marginBottom: 24 }}>
+          <li>
+            <Link href="/api/health">Health endpoint</Link>
+          </li>
+        </ul>
+        <Link 
+          href="/settings"
+          style={{
+            display: "inline-block",
+            background: "#24283b",
+            color: "white",
+            textDecoration: "none",
+            padding: "8px 16px",
+            borderRadius: 6,
+            fontSize: 14
+          }}
+        >
+          ⚙️ Open Settings
+        </Link>
+      </section>
+
+      <footer style={{ marginTop: 64, borderTop: "1px solid #24283b", paddingTop: 24, color: "#565f89", fontSize: 12 }}>
+        <p>Twitch Lurker Bot v1.0.1 • Running on Vercel</p>
+      </footer>
+    </div>
+  );
+}
+
+function Card({ title, value }: { title: string; value: string }) {
+  return (
+    <div
+      style={{
+        border: "1px solid #24283b",
+        borderRadius: 8,
+        padding: 12,
+        background: "#14182c",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#a7abb9", marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 18 }}>{value}</div>
     </div>
   );
 }
