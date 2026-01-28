@@ -27,6 +27,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
 
   // Check for silent mode (Visuals Only)
   const [isSilentMode, setIsSilentMode] = useState(false);
+  const [isAudioLocked, setIsAudioLocked] = useState(false); // New state to track Autoplay blocks
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -42,7 +43,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     console.log(`[ShoutoutDebug] ${msg}`);
   };
 
-  const enableAudio = () => {
+  const unlockAudio = () => {
       // Play a silent buffer to unlock AudioContext (valid WAV header)
       const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
       const audio = new Audio(silentWav);
@@ -50,11 +51,19 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
       audio.play().then(() => {
           addLog("Audio Context Unlocked ✅");
           setAudioEnabled(true);
+          setIsAudioLocked(false);
       }).catch(e => {
           addLog(`Unlock failed: ${e.message}`);
-          // Still set to true to try anyway (maybe browser allows via user interaction elsewhere)
-          setAudioEnabled(true);
+          // Still try to clear the lock visually
+          setIsAudioLocked(false);
       });
+  };
+
+  const handleAutoplayError = (errorName: string) => {
+      if (errorName === 'NotAllowedError' || errorName === 'not-allowed') {
+          addLog("⚠️ Autoplay Blocked! Click overlay to enable.");
+          setIsAudioLocked(true);
+      }
   };
 
 
@@ -62,6 +71,9 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
+        // Log all voices for debugging
+        console.log("[TTS] Available Voices:", voices.map(v => `${v.name} (${v.lang})`));
+        
         // 1. Try exact pt-BR match
         let voice = voices.find(v => v.lang === 'pt-BR' || v.lang === 'pt_BR');
         
@@ -80,10 +92,11 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         }
 
         if (voice) {
-          console.log(`[TTS] Selected voice: ${voice.name} (${voice.lang})`);
+          addLog(`Selected Voice: ${voice.name}`);
           preferredVoiceRef.current = voice;
         } else {
-            console.warn("[TTS] No Portuguese voice found in:", voices.map(v => `${v.name} (${v.lang})`));
+            addLog("No PT Voice found - using default");
+            console.warn("[TTS] No Portuguese voice found");
         }
       }
     };
@@ -222,6 +235,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
 
         utterance.onerror = (e) => {
             addLog(`Browser TTS Error: ${e.error}`);
+            handleAutoplayError(e.error);
             if (!hasStarted) onStart();
             onEnd();
         };
@@ -229,64 +243,36 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         window.speechSynthesis.speak(utterance);
     };
     
-    // --- STRATEGY 1: STREAM ELEMENTS (Direct Audio) ---
-    const playStreamElements = () => {
-        addLog("Attempt 1: StreamElements (Direct)...");
-        const url = `https://api.streamelements.com/kappa/v2/speech?voice=Vitoria&text=${encodedText}`;
+    // --- PROXY STRATEGY: Call internal API (bypasses CORS/OBS blocks) ---
+    const playProxyTTS = () => {
+        addLog("Requesting TTS from Backend...");
+        
+        // Use the internal API route
+        const url = `/api/tts?text=${encodedText}`;
         const audio = new Audio(url);
         audio.volume = 1.0;
 
         audio.onplay = () => {
-            addLog("StreamElements Playing 🔊");
+            addLog("Proxy TTS Playing 🔊");
             hasStarted = true;
             onStart();
         };
 
         audio.onended = () => {
-            addLog("StreamElements Finished");
+            addLog("Proxy TTS Finished");
             onEnd();
         };
 
-        audio.onerror = () => {
+        audio.onerror = (e) => {
             const err = audio.error;
-            addLog(`SE Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
-            playGoogleTTS(); // Fallback
-        };
-
-        audio.play().catch(e => {
-            addLog(`SE Blocked: ${e.name} - ${e.message}`);
-            playGoogleTTS(); // Fallback
-        });
-    };
-
-    // --- STRATEGY 2: GOOGLE TTS (Direct Audio) ---
-    const playGoogleTTS = () => {
-        addLog("Attempt 2: Google TTS (Direct)...");
-        // Try client=tw-ob first as it's standard for this hack
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${encodedText}`;
-        
-        const audio = new Audio(url);
-        audio.volume = 1.0;
-        
-        audio.onplay = () => {
-            addLog("Google TTS Playing 🔊");
-            hasStarted = true;
-            onStart();
-        };
-        
-        audio.onended = () => {
-            addLog("Google TTS Finished");
-            onEnd();
-        };
-        
-        audio.onerror = () => {
-            const err = audio.error;
-            addLog(`Google Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
+            addLog(`Proxy Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
+            // If proxy fails (e.g., 500 error), fall back to browser
             fallbackToBrowserTTS();
         };
-        
+
         audio.play().catch(e => {
-            addLog(`Google Blocked: ${e.name} - ${e.message}`);
+            addLog(`Proxy Blocked: ${e.name} - ${e.message}`);
+            handleAutoplayError(e.name);
             fallbackToBrowserTTS();
         });
     };
@@ -300,7 +286,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
          return;
     }
 
-    playStreamElements();
+    playProxyTTS();
 
     // Safety fallback timeout
     setTimeout(() => {
@@ -313,94 +299,133 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
              onStart();
              onEnd(); // Ensure queue clears
         }
-    }, 5000); // Extended to 5s
+    }, 8000); // Extended to 8s for network request
   };
+
+  if (isAudioLocked) {
+      return (
+          <div 
+            onClick={unlockAudio}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: 'rgba(255, 0, 0, 0.8)',
+                color: 'white',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                cursor: 'pointer',
+                fontFamily: 'Arial, sans-serif',
+                textAlign: 'center'
+            }}
+          >
+              <h1 style={{ fontSize: '48px', margin: '0 0 20px 0' }}>⚠️ TTS BLOCKED</h1>
+              <p style={{ fontSize: '24px' }}>Click anywhere to enable audio!</p>
+              <p style={{ fontSize: '16px', marginTop: '20px' }}>OBS Users: Interact with the source or check "Control Audio via OBS"</p>
+          </div>
+      );
+  }
+
+  if (!audioEnabled) {
+      return (
+          <div 
+            onClick={unlockAudio}
+            style={{
+                position: 'fixed',
+                bottom: '10px',
+                right: '10px',
+                background: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                padding: '10px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                zIndex: 9999,
+                fontSize: '12px'
+            }}
+          >
+              Click to Enable Audio 🔊
+          </div>
+      );
+  }
 
   return (
     <>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
-      
-      {/* Audio Enable Overlay */}
-      {!audioEnabled && (
-        <div 
-            onClick={enableAudio}
-            style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(0,0,0,0.85)', color: 'white',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                zIndex: 9999, cursor: 'pointer', flexDirection: 'column',
-                textAlign: 'center', padding: '20px'
-            }}>
-            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🔇 TTS Audio Blocked</div>
-            <div style={{ fontSize: '24px', color: '#fbbf24', fontWeight: 'bold' }}>
-                OBS: Right Click Source ➡ Interact ➡ Click Here
-            </div>
-            <div style={{ marginTop: '20px', opacity: 0.8, fontSize: '18px' }}>
-                Or Uncheck "Control Audio via OBS" in Source Properties
-            </div>
-        </div>
-      )}
-
-      {/* Debug Logs (Bottom Left) */}
+      {/* Logs Overlay */}
       <div style={{
-          position: 'fixed', bottom: 10, left: 10,
-          background: 'rgba(0,0,0,0.5)', color: '#0f0',
-          padding: '5px', fontSize: '12px', fontFamily: 'monospace',
-          pointerEvents: 'none', borderRadius: '4px'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          padding: '5px',
+          background: 'rgba(0,0,0,0.5)',
+          color: '#0f0',
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          maxWidth: '400px',
+          zIndex: 9000,
+          pointerEvents: 'none'
       }}>
-          {logs.map((log, i) => <div key={i}>{log}</div>)}
+          {logs.map((log, i) => (
+              <div key={i}>{log}</div>
+          ))}
       </div>
 
       {currentShoutout && (
-      <div style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        background: 'linear-gradient(135deg, rgba(20, 0, 40, 0.95), rgba(40, 0, 80, 0.9))',
-        padding: '30px 50px',
-        borderRadius: '24px',
-        border: '3px solid #d8b4fe',
-        color: 'white',
-        textAlign: 'center',
-        boxShadow: '0 0 30px rgba(168, 85, 247, 0.6), inset 0 0 20px rgba(168, 85, 247, 0.2)',
-        animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-        maxWidth: '80vw',
-        width: 'auto',
-        minWidth: '300px',
-        zIndex: 9999,
-        fontFamily: "'Poppins', sans-serif"
-      }}>
-        <div style={{ 
-          fontSize: '2.5rem', 
-          fontWeight: 'bold', 
-          marginBottom: '15px',
-          color: '#fbbf24', // Amber/Gold color
-          fontFamily: "'Bangers', cursive",
-          letterSpacing: '2px',
-          textShadow: '3px 3px 0px #000'
+        <div style={{
+          position: 'fixed',
+          top: '50px',
+          right: '50px',
+          background: 'linear-gradient(135deg, #6e45e2, #88d3ce)',
+          padding: '20px',
+          borderRadius: '15px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          color: 'white',
+          fontFamily: "'Poppins', sans-serif",
+          maxWidth: '400px',
+          animation: 'slideIn 0.5s ease-out',
+          zIndex: 1000,
+          border: '3px solid white'
         }}>
-          {currentShoutout.user} SAYS:
+          <div style={{
+            fontSize: '1.2rem',
+            fontWeight: 'bold',
+            marginBottom: '5px',
+            textShadow: '2px 2px 0px #000'
+          }}>
+            🎉 Shoutout!
+          </div>
+          <div style={{
+            fontSize: '1.5rem',
+            fontFamily: "'Bangers', cursive",
+            letterSpacing: '1px',
+            textShadow: '3px 3px 0px #000',
+            marginBottom: '10px'
+          }}>
+            {currentShoutout.user}
+          </div>
+          <div style={{
+            fontSize: '1.1rem',
+            lineHeight: '1.4',
+            background: 'rgba(0,0,0,0.2)',
+            padding: '10px',
+            borderRadius: '10px'
+          }}>
+            {currentShoutout.message}
+          </div>
         </div>
-        <div style={{ 
-          fontSize: '2rem',
-          lineHeight: '1.4',
-          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-          fontWeight: 600
-        }}>
-          "{currentShoutout.message}"
-        </div>
-        
-        <style jsx>{`
-          @keyframes popIn {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          }
-        `}</style>
-      </div>
       )}
+      
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Poppins:wght@400;700&display=swap');
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
     </>
   );
 }
