@@ -102,21 +102,29 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     isPlayingRef.current = true;
     const next = queueRef.current.shift();
     if (next) {
-      setCurrentShoutout(next);
-      speak(next.message, () => {
-        // After speech + display time
-        setTimeout(() => {
-            setCurrentShoutout(null);
-            isPlayingRef.current = false;
-            processQueue(); // Process next
-        }, 2000); // Wait 2s after speech ends before clearing
-      });
+      // Don't show visuals yet - wait for TTS start
+      speak(
+        next.message, 
+        () => {
+            // onStart: Show Visuals NOW
+            setCurrentShoutout(next);
+        },
+        () => {
+            // onEnd: Cleanup after delay
+            setTimeout(() => {
+                setCurrentShoutout(null);
+                isPlayingRef.current = false;
+                processQueue(); // Process next
+            }, 2000); 
+        }
+      );
     }
   };
 
-  const speak = (text: string, onEnd: () => void) => {
+  const speak = (text: string, onStart: () => void, onEnd: () => void) => {
     if (!window.speechSynthesis) {
         console.warn("TTS not supported");
+        onStart(); // Force visual show even if no TTS
         onEnd();
         return;
     }
@@ -138,12 +146,18 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     utterance.rate = 0.8; // Slower speed
     utterance.pitch = 1;
     
+    utterance.onstart = () => {
+        onStart();
+    };
+
     utterance.onend = () => {
         onEnd();
     };
     
     utterance.onerror = (e) => {
         console.error("TTS Error", e);
+        // Ensure we don't stall the queue on error
+        onStart(); 
         onEnd();
     };
 
