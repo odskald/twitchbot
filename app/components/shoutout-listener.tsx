@@ -68,8 +68,8 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
 
     client.on("message", (channel, tags, message, self) => {
       // Look for the specific bot pattern: [100 pts] @User says: Message
-      // Regex: ^\[100 pts\] @(\w+) says: (.*)$
-      const match = message.match(/^\[100 pts\] @(\w+) says: (.*)$/);
+      // Regex updated to support all characters in username (non-greedy match before " says: ")
+      const match = message.match(/^\[100 pts\] @(.+?) says: (.*)$/);
       
       if (match) {
         const user = match[1];
@@ -153,43 +153,57 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   if (!currentShoutout) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      background: 'rgba(0, 0, 0, 0.8)',
-      padding: '20px 40px',
-      borderRadius: '16px',
-      border: '2px solid #a855f7',
-      color: 'white',
-      textAlign: 'center',
-      boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)',
-      animation: 'fadeIn 0.5s ease-out',
-      maxWidth: '80vw',
-      zIndex: 9999
-    }}>
-      <div style={{ 
-        fontSize: '1.5rem', 
-        fontWeight: 'bold', 
-        marginBottom: '10px',
-        color: '#d8b4fe' 
-      }}>
-        {currentShoutout.user} says:
-      </div>
-      <div style={{ 
-        fontSize: '2rem',
-        textShadow: '0 2px 4px rgba(0,0,0,0.5)' 
-      }}>
-        "{currentShoutout.message}"
-      </div>
+    <>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
       
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translate(-50%, -40%); }
-          to { opacity: 1; transform: translate(-50%, -50%); }
-        }
-      `}</style>
-    </div>
+      <div style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        background: 'linear-gradient(135deg, rgba(20, 0, 40, 0.95), rgba(40, 0, 80, 0.9))',
+        padding: '30px 50px',
+        borderRadius: '24px',
+        border: '3px solid #d8b4fe',
+        color: 'white',
+        textAlign: 'center',
+        boxShadow: '0 0 30px rgba(168, 85, 247, 0.6), inset 0 0 20px rgba(168, 85, 247, 0.2)',
+        animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        maxWidth: '80vw',
+        width: 'auto',
+        minWidth: '300px',
+        zIndex: 9999,
+        fontFamily: "'Poppins', sans-serif"
+      }}>
+        <div style={{ 
+          fontSize: '2.5rem', 
+          fontWeight: 'bold', 
+          marginBottom: '15px',
+          color: '#fbbf24', // Amber/Gold color
+          fontFamily: "'Bangers', cursive",
+          letterSpacing: '2px',
+          textShadow: '3px 3px 0px #000'
+        }}>
+          {currentShoutout.user} SAYS:
+        </div>
+        <div style={{ 
+          fontSize: '2rem',
+          lineHeight: '1.4',
+          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+          fontWeight: 600
+        }}>
+          "{currentShoutout.message}"
+        </div>
+        
+        <style jsx>{`
+          @keyframes popIn {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          }
+        `}</style>
+      </div>
+    </>
   );
 }
