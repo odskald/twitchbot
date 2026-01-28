@@ -226,64 +226,72 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         window.speechSynthesis.speak(utterance);
     };
     
-    // --- PRIMARY: GOOGLE TRANSLATE (Reliable, No API Key) ---
-    const playGoogleTTS = () => {
-        // Use client=gtx (often more permissive than tw-ob)
-        const googleUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=pt-BR&q=${encodedText}`;
-        
-        addLog(`Fetching Google TTS...`);
-        
-        // Use fetch + blob to bypass streaming issues in OBS
-        fetch(googleUrl)
-            .then(async (res) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const blob = await res.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                
-                addLog("TTS Fetched -> Playing");
-                const audio = new Audio(blobUrl);
-                audio.volume = 1.0;
-                
-                audio.onplay = () => {
-                    addLog("Google TTS Playing 🔊");
-                    hasStarted = true;
-                    onStart();
-                };
-                
-                audio.onended = () => {
-                    addLog("Google TTS Finished");
-                    URL.revokeObjectURL(blobUrl);
-                    onEnd();
-                };
-                
-                audio.onerror = (e) => {
-                    const errorType = e instanceof Event ? e.type : String(e);
-                    addLog(`Audio Play Error: ${errorType}`);
-                    URL.revokeObjectURL(blobUrl);
-                    fallbackToBrowserTTS();
-                };
-                
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        if (error.name === 'NotAllowedError') {
-                            addLog("Autoplay Blocked -> Require Interaction");
-                            setAudioEnabled(false);
-                        }
-                        addLog(`Play Blocked: ${error.message}`);
-                        URL.revokeObjectURL(blobUrl);
-                        fallbackToBrowserTTS();
-                    });
-                }
-            })
-            .catch(err => {
-                addLog(`Fetch Error: ${err.message}`);
-                fallbackToBrowserTTS();
-            });
+    // --- STRATEGY 1: STREAM ELEMENTS (Direct Audio) ---
+    const playStreamElements = () => {
+        addLog("Attempt 1: StreamElements (Direct)...");
+        const url = `https://api.streamelements.com/kappa/v2/speech?voice=Vitoria&text=${encodedText}`;
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+
+        audio.onplay = () => {
+            addLog("StreamElements Playing 🔊");
+            hasStarted = true;
+            onStart();
+        };
+
+        audio.onended = () => {
+            addLog("StreamElements Finished");
+            onEnd();
+        };
+
+        audio.onerror = (e) => {
+            const target = e.target as HTMLAudioElement;
+            const err = target.error;
+            addLog(`SE Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
+            playGoogleTTS(); // Fallback
+        };
+
+        audio.play().catch(e => {
+            addLog(`SE Blocked: ${e.name} - ${e.message}`);
+            playGoogleTTS(); // Fallback
+        });
     };
 
-    // Start with Google TTS
-    playGoogleTTS();
+    // --- STRATEGY 2: GOOGLE TTS (Direct Audio) ---
+    const playGoogleTTS = () => {
+        addLog("Attempt 2: Google TTS (Direct)...");
+        // Try client=tw-ob first as it's standard for this hack
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${encodedText}`;
+        
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+        
+        audio.onplay = () => {
+            addLog("Google TTS Playing 🔊");
+            hasStarted = true;
+            onStart();
+        };
+        
+        audio.onended = () => {
+            addLog("Google TTS Finished");
+            onEnd();
+        };
+        
+        audio.onerror = (e) => {
+            const target = e.target as HTMLAudioElement;
+            const err = target.error;
+            addLog(`Google Error: Code ${err?.code} (${err?.message || 'Unknown'})`);
+            fallbackToBrowserTTS();
+        };
+        
+        audio.play().catch(e => {
+            addLog(`Google Blocked: ${e.name} - ${e.message}`);
+            fallbackToBrowserTTS();
+        });
+    };
+
+    // Start Chain
+    playStreamElements();
 
     // Safety fallback timeout
     setTimeout(() => {
