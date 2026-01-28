@@ -15,7 +15,8 @@ interface ShoutoutMessage {
 
 export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   const [currentShoutout, setCurrentShoutout] = useState<ShoutoutMessage | null>(null);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  // Default to TRUE (Optimistic Autoplay). If blocked, we set to false to show overlay.
+  const [audioEnabled, setAudioEnabled] = useState(true);
   const [logs, setLogs] = useState<string[]>([]);
   
   const clientRef = useRef<tmi.Client | null>(null);
@@ -32,7 +33,6 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('silent') === 'true') {
             setIsSilentMode(true);
-            setAudioEnabled(true); // Auto-enable visuals since no audio is needed
         }
     }
   }, []);
@@ -251,6 +251,10 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         };
         
         audio.play().catch(e => {
+            if (e.name === 'NotAllowedError') {
+                addLog("Autoplay Blocked -> Require Interaction");
+                setAudioEnabled(false);
+            }
             addLog(`Google TTS Blocked: ${e.message}`);
             fallbackToBrowserTTS();
         });
@@ -284,6 +288,10 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const playPromise = audio.play();
     if (playPromise !== undefined) {
         playPromise.catch(error => {
+            if (error.name === 'NotAllowedError') {
+                addLog("Autoplay Blocked -> Require Interaction");
+                setAudioEnabled(false);
+            }
             addLog(`StreamElements Blocked: ${error.message}`);
             playGoogleFallback();
         });
@@ -314,12 +322,18 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             onClick={enableAudio}
             style={{
                 position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(0,0,0,0.8)', color: 'white',
+                background: 'rgba(0,0,0,0.85)', color: 'white',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                zIndex: 9999, cursor: 'pointer', flexDirection: 'column'
+                zIndex: 9999, cursor: 'pointer', flexDirection: 'column',
+                textAlign: 'center', padding: '20px'
             }}>
-            <div style={{ fontSize: '40px' }}>🔇 Click to Enable Audio</div>
-            <div style={{ marginTop: '10px', opacity: 0.7 }}>Required for TTS</div>
+            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🔇 TTS Audio Blocked</div>
+            <div style={{ fontSize: '24px', color: '#fbbf24', fontWeight: 'bold' }}>
+                OBS: Right Click Source ➡ Interact ➡ Click Here
+            </div>
+            <div style={{ marginTop: '20px', opacity: 0.8, fontSize: '18px' }}>
+                Or Uncheck "Control Audio via OBS" in Source Properties
+            </div>
         </div>
       )}
 
