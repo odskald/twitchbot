@@ -18,6 +18,45 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   const clientRef = useRef<tmi.Client | null>(null);
   const queueRef = useRef<ShoutoutMessage[]>([]);
   const isPlayingRef = useRef(false);
+  const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        // 1. Try exact pt-BR match
+        let voice = voices.find(v => v.lang === 'pt-BR' || v.lang === 'pt_BR');
+        
+        // 2. Try matching common Brazilian voice names
+        if (!voice) {
+          voice = voices.find(v => 
+            v.name.includes('Google Português') || 
+            v.name.includes('Microsoft Maria') ||
+            v.name.includes('Luciana')
+          );
+        }
+
+        // 3. Fallback to any 'pt'
+        if (!voice) {
+          voice = voices.find(v => v.lang.toLowerCase().includes('pt'));
+        }
+
+        if (voice) {
+          console.log(`[TTS] Selected voice: ${voice.name} (${voice.lang})`);
+          preferredVoiceRef.current = voice;
+        } else {
+            console.warn("[TTS] No Portuguese voice found in:", voices.map(v => `${v.name} (${v.lang})`));
+        }
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    return () => {
+        window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!channel) return;
@@ -87,30 +126,11 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
 
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Select Portuguese voice
-    let voices = window.speechSynthesis.getVoices();
-    
-    // Retry getting voices if empty (common Chrome issue)
-    if (voices.length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => {
-             voices = window.speechSynthesis.getVoices();
-        };
-    }
-
-    // Prioritize Brazilian Portuguese (pt-BR)
-    let ptVoice = voices.find(v => v.lang === 'pt-BR' || v.lang === 'pt_BR');
-    
-    // Fallback to any Portuguese
-    if (!ptVoice) {
-        ptVoice = voices.find(v => v.lang.toLowerCase().includes('pt'));
-    }
-
-    if (ptVoice) {
-        console.log(`Using voice: ${ptVoice.name} (${ptVoice.lang})`);
-        utterance.voice = ptVoice;
-        utterance.lang = ptVoice.lang;
+    if (preferredVoiceRef.current) {
+        utterance.voice = preferredVoiceRef.current;
+        utterance.lang = preferredVoiceRef.current.lang;
     } else {
-        console.warn("No specific Portuguese voice found. Setting lang to pt-BR.");
+        // Last resort fallback
         utterance.lang = 'pt-BR';
     }
     
