@@ -225,7 +225,8 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         };
         
         audio.onerror = (e) => {
-            addLog(`Google TTS Failed: ${e.type}`);
+            const errorType = e instanceof Event ? e.type : String(e);
+            addLog(`Google TTS Failed: ${errorType}`);
             fallbackToBrowserTTS();
         };
         
