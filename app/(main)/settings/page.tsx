@@ -6,7 +6,25 @@ import { SettingsForm } from "./settings-form";
 
 export const dynamic = "force-dynamic";
 
+import { isSettingsAuthenticated } from "@/app/actions/auth";
+import { SettingsLock } from "@/app/components/settings-lock";
+
 export default async function SettingsPage() {
+  const isAuthenticated = await isSettingsAuthenticated();
+  
+  if (!isAuthenticated) {
+    return (
+      <div>
+         <div style={{ marginBottom: 24 }}>
+          <Link href="/" style={{ color: "#a7abb9", textDecoration: "none" }}>
+            ← Back to Dashboard
+          </Link>
+        </div>
+        <SettingsLock />
+      </div>
+    );
+  }
+
   let dbConfig = null;
   let effectiveConfig = null;
   let dbError = null;
