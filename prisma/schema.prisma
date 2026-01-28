@@ -12,6 +12,7 @@ datasource db {
 enum TransactionType {
   AWARD
   DEDUCT
+  SPEND
 }
 
 model User {
@@ -26,6 +27,7 @@ model User {
 
   // Relations
   pointLedger  PointLedger[]
+  redemptions  Redemption[]
 }
 
 model Channel {
@@ -43,7 +45,7 @@ model Channel {
 model PointLedger {
   id           String           @id @default(cuid())
   userId       String
-  channelId    String
+  channelId    String?
   points       Int
   type         TransactionType
   reason       String?
@@ -51,7 +53,7 @@ model PointLedger {
 
   // Relations
   user         User             @relation(fields: [userId], references: [id])
-  channel      Channel          @relation(fields: [channelId], references: [id])
+  channel      Channel?         @relation(fields: [channelId], references: [id])
 
   @@index([userId, channelId, createdAt])
 }
@@ -79,4 +81,27 @@ model GlobalConfig {
   botUserId           String?
   botUserName         String?
   updatedAt           DateTime @updatedAt
+}
+
+model ShopItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  cost        Int
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  redemptions Redemption[]
+}
+
+model Redemption {
+  id          String   @id @default(cuid())
+  userId      String
+  itemId      String
+  cost        Int
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  item        ShopItem @relation(fields: [itemId], references: [id])
 }
