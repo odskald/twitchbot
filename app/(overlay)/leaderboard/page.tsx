@@ -1,22 +1,42 @@
-import prisma from "@/lib/db";
+"use client";
+
+import { useEffect, useState } from "react";
 import LeaderboardDisplay from "./leaderboard-display";
 
-export const dynamic = "force-dynamic";
+interface UserData {
+  displayName: string | null;
+  points: number;
+  level: number;
+  xp?: number;
+}
 
-export default async function LeaderboardPage() {
-  const topPoints = await prisma.user.findMany({
-    orderBy: { points: 'desc' },
-    take: 5,
-    select: { displayName: true, points: true, level: true, xp: true }
-  });
+export default function LeaderboardPage() {
+  const [data, setData] = useState<{ topPoints: UserData[]; topLevel: UserData[] } | null>(null);
 
-  const topLevel = await prisma.user.findMany({
-    orderBy: { xp: 'desc' },
-    take: 5,
-    select: { displayName: true, points: true, level: true, xp: true }
-  });
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/stats/leaderboard");
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (err) {
+        console.error("Failed to fetch leaderboard", err);
+      }
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, 5000); // Poll every 5s
+
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!data) {
+    return <div style={{ color: "white", padding: 16 }}>Loading...</div>;
+  }
 
   return (
-    <LeaderboardDisplay topPoints={topPoints} topLevel={topLevel} />
+    <LeaderboardDisplay topPoints={data.topPoints} topLevel={data.topLevel} />
   );
 }
