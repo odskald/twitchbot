@@ -4,6 +4,8 @@ import { getGlobalConfig } from "@/lib/config";
 import { updateGlobalConfig } from "@/app/actions/settings";
 import prisma from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   // Fetch direct from DB to see what's stored vs env
   const dbConfig = await prisma.globalConfig.findUnique({
