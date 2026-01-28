@@ -1,6 +1,5 @@
 import prisma from "@/lib/db";
 import LeaderboardDisplay from "./leaderboard-display";
-import AutoRefresh from "@/app/components/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +17,6 @@ export default async function LeaderboardPage() {
   });
 
   return (
-    <>
-      <AutoRefresh intervalMs={5000} />
-      <LeaderboardDisplay topPoints={topPoints} topLevel={topLevel} />
-    </>
+    <LeaderboardDisplay topPoints={topPoints} topLevel={topLevel} />
   );
 }

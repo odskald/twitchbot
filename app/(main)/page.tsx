@@ -2,7 +2,6 @@ import React from "react";
 import Link from "next/link";
 import prisma from "@/lib/db";
 import { getLiveChatters } from "@/lib/twitch-api";
-import AutoRefresh from "@/app/components/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +30,6 @@ export default async function Page() {
 
   return (
     <div>
-      <AutoRefresh intervalMs={30000} />
       <section>
         <h2>Bot status</h2>
         <div
