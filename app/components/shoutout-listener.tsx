@@ -355,25 +355,6 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
 
   return (
     <>
-      {/* Logs Overlay */}
-      <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          padding: '5px',
-          background: 'rgba(0,0,0,0.5)',
-          color: '#0f0',
-          fontFamily: 'monospace',
-          fontSize: '10px',
-          maxWidth: '400px',
-          zIndex: 9000,
-          pointerEvents: 'none'
-      }}>
-          {logs.map((log, i) => (
-              <div key={i}>{log}</div>
-          ))}
-      </div>
-
       {currentShoutout && (
         <div style={{
           position: 'fixed',

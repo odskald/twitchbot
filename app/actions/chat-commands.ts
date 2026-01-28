@@ -46,8 +46,13 @@ export async function processChatCommand(
     const chatterId = userContext.userId;
     const lowerCommand = command.toLowerCase();
 
+    // Command: !comandos / !commands
+    if (lowerCommand === '!comandos' || lowerCommand === '!commands') {
+        const msg = `@${chatterName}, Available commands: !msg <text> (100 pts), !music <yt_link>, !pontos, !shop, !buy <item>.`;
+        await sendChatMessage(msg);
+    }
+
     // Command: !pontos
-    if (lowerCommand === '!pontos') {
         const user = await prisma.user.findUnique({
             where: { twitchId: chatterId }
         });

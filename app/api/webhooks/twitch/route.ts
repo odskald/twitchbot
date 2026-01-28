@@ -56,8 +56,14 @@ export async function POST(req: NextRequest) {
         const args = text.split(' ');
         const command = args[0].toLowerCase();
 
+        // Command: !comandos / !commands
+        if (command === '!comandos' || command === '!commands') {
+             const msg = `@${chatterName}, Available commands: !msg <text> (100 pts), !music <yt_link>, !pontos, !shop, !buy <item>.`;
+             await sendChatMessage(msg);
+        }
+
         // Command: !pontos
-        if (command === '!pontos') {
+        if (command === '!pontos' || command === '!points') {
             try {
                 const user = await prisma.user.findUnique({
                     where: { twitchId: chatterId }
