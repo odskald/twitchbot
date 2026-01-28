@@ -26,10 +26,20 @@ export default async function LeaderboardPage() {
     select: { displayName: true, points: true, level: true, xp: true }
   });
 
+  const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+  const channel = config?.twitchChannel || config?.botUserName || "";
+
   return (
     <>
       <AutoRefresh intervalMs={5000} />
+      {channel && <ChatListenerWrapper channel={channel} />}
       <LeaderboardDisplay topPoints={topPoints} topLevel={topLevel} />
     </>
   );
+}
+
+import { ChatListener } from "@/app/components/chat-listener";
+
+function ChatListenerWrapper({ channel }: { channel: string }) {
+    return <ChatListener channel={channel} />;
 }

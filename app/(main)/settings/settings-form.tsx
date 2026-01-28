@@ -80,6 +80,12 @@ function ChatSubscriptionSection() {
     
           <ChatSubscriptionButton />
         </form>
+        {/* Helper text explaining the new architecture */}
+        <div style={{ marginTop: 16, padding: 12, background: "rgba(59, 130, 246, 0.1)", borderRadius: 6, color: "#93c5fd", fontSize: 13, border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+           ℹ️ <strong>Note:</strong> Chat commands (!pontos, !shop) now work via the Overlay/Leaderboard. 
+           Keep the <a href="/leaderboard" target="_blank" style={{ color: "#fff", textDecoration: "underline" }}>Leaderboard</a> open in a browser tab or OBS source for the bot to reply to chat.
+        </div>
+    </div>
     );
 }
 
