@@ -36,7 +36,25 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
   const [state, formAction] = useFormState(updateGlobalConfig, initialState);
 
   return (
-    <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 600 }}>
+    <div style={{ maxWidth: 600 }}>
+      <div style={{ marginBottom: 32, padding: 16, border: "1px solid #24283b", borderRadius: 8, background: "#1a1b26" }}>
+        <h3 style={{ marginTop: 0, marginBottom: 12 }}>Bot Authorization</h3>
+        <p style={{ fontSize: 14, color: "#a7abb9", marginBottom: 16 }}>
+          The bot needs permission to read chatters and events. Click below to log in with the bot account.
+        </p>
+        {dbConfig?.botUserName ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ color: "#34d399", fontSize: 14 }}>
+              ✅ Connected as <strong>{dbConfig.botUserName}</strong>
+            </span>
+            <a href="/api/auth/twitch" style={{ fontSize: 12, color: "#7aa2f7", textDecoration: "none" }}>(Reconnect)</a>
+          </div>
+        ) : (
+          <a href="/api/auth/twitch" style={{ display: "inline-block", background: "#7aa2f7", color: "#1a1b26", padding: "8px 16px", borderRadius: 4, textDecoration: "none", fontWeight: "bold", fontSize: 14 }}>Connect Bot Account</a>
+        )}
+      </div>
+
+      <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       
       {state?.message && (
         <div style={{ 
@@ -91,6 +109,7 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
         <SubmitButton />
       </div>
     </form>
+    </div>
   );
 }
 
