@@ -64,21 +64,31 @@ export default async function Page() {
             </p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {liveChatters.chatters.map((chatter) => (
-              <span 
+              <div 
                 key={chatter.user_id}
                 style={{
                   background: "#1a1b26",
                   border: "1px solid #24283b",
-                  padding: "4px 12px",
-                  borderRadius: 16,
-                  fontSize: 14,
-                  color: "#c0caf5"
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 120
                 }}
               >
-                {chatter.user_name}
-              </span>
+                <span style={{ fontSize: 14, fontWeight: "bold", color: "#c0caf5", marginBottom: 4 }}>
+                  {chatter.user_name}
+                </span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7aa2f7" }}>
+                  <span>Lvl {chatter.level || 1}</span>
+                  <span>{chatter.points || 0} Pts</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#565f89", marginTop: 2 }}>
+                  XP: {chatter.xp || 0}
+                </div>
+              </div>
             ))}
           </div>
         )}

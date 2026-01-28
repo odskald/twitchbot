@@ -13,6 +13,10 @@ export interface Chatter {
   user_id: string;
   user_login: string;
   user_name: string;
+  // Enriched fields from DB
+  points?: number;
+  level?: number;
+  xp?: number;
 }
 
 /**
@@ -147,12 +151,10 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
     }
 
     const data = await response.json();
+    let enrichedChatters: Chatter[] = data.data || [];
     
     // START LURKING: Track these users in the database
-    // We do this asynchronously to not block the UI response too much, 
-    // but in Server Actions/Components we should ideally await it or use a queue.
-    // Given the constraints, we'll await it to ensure data consistency.
-    if (data.data && data.data.length > 0) {
+    if (enrichedChatters.length > 0) {
       try {
         // 1. Ensure Channel Exists
         await prisma.channel.upsert({
@@ -162,21 +164,43 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
         });
 
         // 2. Upsert Users (Batch or Loop)
-        // Prisma doesn't support "upsertMany" natively for SQLite/Postgres in the same way,
-        // but we can use transaction or just Promise.all for now (limit 100 is small enough).
-        await Promise.all(data.data.map((chatter: Chatter) => 
+        // We must update 'updatedAt' to track "last seen"
+        await Promise.all(enrichedChatters.map((chatter: Chatter) => 
           prisma.user.upsert({
             where: { twitchId: chatter.user_id },
             update: { 
               displayName: chatter.user_name,
-              updatedAt: new Date() // Updates 'last seen' effectively
+              updatedAt: new Date()
             },
             create: {
               twitchId: chatter.user_id,
-              displayName: chatter.user_name
+              displayName: chatter.user_name,
+              points: 0,
+              level: 1,
+              xp: 0
             }
           })
         ));
+
+        // 3. Fetch Enriched Data (Points, Level, XP)
+        const userIds = enrichedChatters.map(c => c.user_id);
+        const dbUsers = await prisma.user.findMany({
+          where: { twitchId: { in: userIds } },
+          select: { twitchId: true, points: true, level: true, xp: true }
+        });
+
+        // 4. Merge Data
+        const dbUserMap = new Map(dbUsers.map(u => [u.twitchId, u]));
+        enrichedChatters = enrichedChatters.map(chatter => {
+          const dbUser = dbUserMap.get(chatter.user_id);
+          return {
+            ...chatter,
+            points: dbUser?.points || 0,
+            level: dbUser?.level || 1,
+            xp: dbUser?.xp || 0
+          };
+        });
+
       } catch (dbError) {
         console.error("Failed to track chatters in DB:", dbError);
       }
@@ -184,7 +208,7 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
 
     return {
       count: data.total,
-      chatters: data.data, // List of { user_id, user_login, user_name }
+      chatters: enrichedChatters, 
     };
   } catch (error: any) {
     console.error("Failed to fetch chatters:", error);
