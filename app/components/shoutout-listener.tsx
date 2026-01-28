@@ -154,9 +154,10 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const safeText = text.substring(0, 200);
     const encodedText = encodeURIComponent(safeText);
     
-    // 2. Fetch Google TTS Blob (Bypass direct streaming issues in OBS)
-    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=pt-BR&q=${encodedText}`;
-    addLog(`Fetching TTS (Google)...`);
+    // 2. Fetch StreamElements TTS (Robust & Free)
+    // Voice "Vitoria" is a high-quality Portuguese voice
+    const url = `https://api.streamelements.com/kappa/v2/speech?voice=Vitoria&text=${encodedText}`;
+    addLog(`Fetching TTS (StreamElements)...`);
     fetch(url)
         .then(async (response) => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -169,14 +170,14 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             
             // Cleanup blob URL when done
             audio.onended = () => {
-                addLog("Google TTS Finished");
+                addLog("StreamElements TTS Finished");
                 URL.revokeObjectURL(blobUrl);
                 onEnd();
             };
 
             audio.onerror = (e) => {
                 const errorType = e instanceof Event ? e.type : String(e);
-                addLog(`Google TTS Play Error: [${errorType}]`);
+                addLog(`StreamElements TTS Play Error: [${errorType}]`);
                 URL.revokeObjectURL(blobUrl);
                 fallbackToBrowserTTS();
             };
@@ -185,7 +186,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
-                    addLog(`Google TTS Blocked: ${error.message}`);
+                    addLog(`StreamElements TTS Blocked: ${error.message}`);
                     URL.revokeObjectURL(blobUrl);
                     fallbackToBrowserTTS();
                 });
@@ -193,13 +194,13 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             
             // Signal start immediately on play
             audio.onplay = () => {
-                addLog("Google TTS Playing 🔊");
+                addLog("StreamElements TTS Playing 🔊");
                 hasStarted = true;
                 onStart();
             };
         })
         .catch(err => {
-            addLog(`Google Fetch Failed: ${err.message}`);
+            addLog(`StreamElements Fetch Failed: ${err.message}`);
             fallbackToBrowserTTS();
         });
 
