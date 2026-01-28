@@ -133,26 +133,38 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
   }
 
   try {
-    // Helix Get Chatters
-    // Requires moderator:read:chatters scope and moderator_id (bot) + broadcaster_id (channel)
-    const response = await fetch(
-      `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${config.botUserId}&first=100`,
-      {
-        headers: {
-          "Client-ID": config.twitchClientId,
-          "Authorization": `Bearer ${token}`,
-        },
-        next: { revalidate: 30 } // Cache for 30s to avoid rate limits
+    // Helix Get Chatters (Pagination Loop)
+    let allChatters: Chatter[] = [];
+    let cursor: string | undefined = undefined;
+    let totalCount = 0;
+
+    do {
+      const cursorParam: string = cursor ? `&after=${cursor}` : "";
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${config.botUserId}&first=1000${cursorParam}`,
+        {
+          headers: {
+            "Client-ID": config.twitchClientId,
+            "Authorization": `Bearer ${token}`,
+          },
+          next: { revalidate: 30 } // Cache for 30s
+        }
+      );
+
+      if (!response.ok) {
+        console.error("Helix Chatters API Error:", await response.text());
+        break; // Stop fetching on error, return what we have
       }
-    );
 
-    if (!response.ok) {
-      console.error("Helix Chatters API Error:", await response.text());
-      return { count: 0, chatters: [] };
-    }
+      const data = await response.json();
+      const pageChatters: Chatter[] = data.data || [];
+      allChatters = [...allChatters, ...pageChatters];
+      totalCount = data.total; // Total is usually reported in the first response
+      cursor = data.pagination?.cursor;
 
-    const data = await response.json();
-    let enrichedChatters: Chatter[] = data.data || [];
+    } while (cursor);
+
+    let enrichedChatters = allChatters;
     
     // START LURKING: Track these users in the database
     if (enrichedChatters.length > 0) {
@@ -164,81 +176,85 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
           create: { twitchId: broadcasterId, name: targetChannelName }
         });
 
-        // 2. Upsert Users & Award Points/XP
-        // We track 'updatedAt' to calculate time spent since last check.
+        // 2. Upsert Users & Award Points/XP (Process in Chunks to avoid DB overload)
         const now = new Date();
-        const MAX_LURK_GAP_MS = 10 * 60 * 1000; // 10 minutes max gap to award points (prevents huge jumps if bot was off)
+        const MAX_LURK_GAP_MS = 10 * 60 * 1000; // 10 minutes max gap to award points
         const MIN_LURK_GAP_MS = 60 * 1000;      // 1 minute minimum to award points
+        
+        // Fetch existing users (Chunked fetch if list is huge, but here we do one go for <2000 users)
+        // If >2000 users, we should probably chunk this too. Let's do simple chunking.
+        const CHUNK_SIZE = 100;
+        const chunks = [];
+        for (let i = 0; i < enrichedChatters.length; i += CHUNK_SIZE) {
+          chunks.push(enrichedChatters.slice(i, i + CHUNK_SIZE));
+        }
 
-        // Fetch existing users first to check their last seen time
-        const userIds = enrichedChatters.map(c => c.user_id);
-        const existingUsers = await prisma.user.findMany({
-          where: { twitchId: { in: userIds } }
-        });
-        const existingUserMap = new Map(existingUsers.map(u => [u.twitchId, u]));
-
-        await Promise.all(enrichedChatters.map(async (chatter: Chatter) => {
-          const dbUser = existingUserMap.get(chatter.user_id);
-          
-          let pointsToAdd = 0;
-          let xpToAdd = 0;
-          let shouldUpdateTimestamp = false;
-
-          if (dbUser) {
-            const diffMs = now.getTime() - dbUser.updatedAt.getTime();
-            
-            // Only award if within valid window (active session)
-            if (diffMs >= MIN_LURK_GAP_MS && diffMs <= MAX_LURK_GAP_MS) {
-              const minutes = Math.floor(diffMs / 60000);
-              pointsToAdd = minutes * 1; // 1 point per minute
-              xpToAdd = minutes * 3;     // 3 XP per minute
-              shouldUpdateTimestamp = true;
-            } else if (diffMs > MAX_LURK_GAP_MS) {
-              // Gap too large (new session), just reset timestamp
-              shouldUpdateTimestamp = true;
-            }
-          } else {
-            // New user, just create
-            shouldUpdateTimestamp = true;
-          }
-
-          // Calculate new stats
-          const currentXp = (dbUser?.xp || 0) + xpToAdd;
-          const currentPoints = (dbUser?.points || 0) + pointsToAdd;
-          const { level } = calculateLevel(currentXp);
-
-          // Perform Upsert
-          // If we are awarding points, we update 'updatedAt' to 'now' to consume the time.
-          // If we are NOT awarding (diff < 1 min), we keep old 'updatedAt' so time accumulates.
-          // UNLESS it's a new user or a stale session, then we force update.
-          const updateData: any = {
-            displayName: chatter.user_name,
-            points: currentPoints,
-            xp: currentXp,
-            level: level
-          };
-
-          if (shouldUpdateTimestamp) {
-            updateData.updatedAt = now;
-          }
-
-          await prisma.user.upsert({
-            where: { twitchId: chatter.user_id },
-            update: updateData,
-            create: {
-              twitchId: chatter.user_id,
-              displayName: chatter.user_name,
-              points: 0,
-              level: 1,
-              xp: 0,
-              updatedAt: now
-            }
+        for (const chunk of chunks) {
+          const userIds = chunk.map(c => c.user_id);
+          const existingUsers = await prisma.user.findMany({
+            where: { twitchId: { in: userIds } }
           });
-        }));
+          const existingUserMap = new Map(existingUsers.map(u => [u.twitchId, u]));
 
-        // 3. Fetch Enriched Data (Points, Level, XP)
+          await Promise.all(chunk.map(async (chatter: Chatter) => {
+            const dbUser = existingUserMap.get(chatter.user_id);
+            
+            let pointsToAdd = 0;
+            let xpToAdd = 0;
+            let shouldUpdateTimestamp = false;
+
+            if (dbUser) {
+              const diffMs = now.getTime() - dbUser.updatedAt.getTime();
+              
+              if (diffMs >= MIN_LURK_GAP_MS && diffMs <= MAX_LURK_GAP_MS) {
+                const minutes = Math.floor(diffMs / 60000);
+                pointsToAdd = minutes * 1; 
+                xpToAdd = minutes * 3;     
+                shouldUpdateTimestamp = true;
+              } else if (diffMs > MAX_LURK_GAP_MS) {
+                shouldUpdateTimestamp = true;
+              }
+            } else {
+              shouldUpdateTimestamp = true;
+            }
+
+            const currentXp = (dbUser?.xp || 0) + xpToAdd;
+            const currentPoints = (dbUser?.points || 0) + pointsToAdd;
+            const { level } = calculateLevel(currentXp);
+
+            const updateData: any = {
+              displayName: chatter.user_name,
+              points: currentPoints,
+              xp: currentXp,
+              level: level
+            };
+
+            if (shouldUpdateTimestamp) {
+              updateData.updatedAt = now;
+            }
+
+            await prisma.user.upsert({
+              where: { twitchId: chatter.user_id },
+              update: updateData,
+              create: {
+                twitchId: chatter.user_id,
+                displayName: chatter.user_name,
+                points: 0,
+                level: 1,
+                xp: 0,
+                updatedAt: now
+              }
+            });
+          }));
+        }
+
+        // 3. Fetch Enriched Data (Points, Level, XP) - Re-fetch updated data
+        // For display purposes, we might just want to return what we just calculated, 
+        // but fetching ensures consistency. We can fetch all at once or per chunk.
+        // For simplicity and "100%" correctness of data returned:
+        const allUserIds = enrichedChatters.map(c => c.user_id);
         const dbUsers = await prisma.user.findMany({
-          where: { twitchId: { in: userIds } },
+          where: { twitchId: { in: allUserIds } },
           select: { twitchId: true, points: true, level: true, xp: true }
         });
 
@@ -260,7 +276,7 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
     }
 
     return {
-      count: data.total,
+      count: totalCount || enrichedChatters.length,
       chatters: enrichedChatters, 
     };
   } catch (error: any) {
