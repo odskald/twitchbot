@@ -30,14 +30,16 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   };
 
   const enableAudio = () => {
-      // Play a silent buffer to unlock AudioContext
-      const audio = new Audio("");
+      // Play a silent buffer to unlock AudioContext (valid WAV header)
+      const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+      const audio = new Audio(silentWav);
+      
       audio.play().then(() => {
           addLog("Audio Context Unlocked ✅");
           setAudioEnabled(true);
       }).catch(e => {
           addLog(`Unlock failed: ${e.message}`);
-          // Still set to true to try anyway
+          // Still set to true to try anyway (maybe browser allows via user interaction elsewhere)
           setAudioEnabled(true);
       });
   };
@@ -146,61 +148,109 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   };
 
   const speak = (text: string, onStart: () => void, onEnd: () => void) => {
-    // New Implementation: Use Google Translate TTS via Audio Element
-    // This bypasses browser synthesis quirks and works better in OBS
+    // HYBRID IMPLEMENTATION: Google TTS -> Browser TTS Fallback
     
-    // 1. Truncate text to 200 chars (Google API limit)
+    // 1. Truncate text to 200 chars
     const safeText = text.substring(0, 200);
     const encodedText = encodeURIComponent(safeText);
     
-    // 2. Construct URL
-    // client=gtx is often more permissive than tw-ob
+    // 2. Google TTS URL
     const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=pt-BR&q=${encodedText}`;
     
-    addLog(`Playing TTS...`);
+    addLog(`Playing TTS (Google)...`);
     const audio = new Audio(url);
     audio.volume = 1.0;
     
     let hasStarted = false;
+    let fallbackTriggered = false;
+
+    // --- FALLBACK SYSTEM ---
+    const fallbackToBrowserTTS = () => {
+        if (fallbackTriggered) return;
+        fallbackTriggered = true;
+        addLog("Google TTS Failed -> Falling back to Browser TTS");
+
+        if (!window.speechSynthesis) {
+            addLog("Browser TTS not supported");
+            if (!hasStarted) onStart();
+            onEnd();
+            return;
+        }
+
+        // Resume audio context
+        if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(safeText);
+        
+        // Use preferred PT-BR voice or fallback
+        if (preferredVoiceRef.current) {
+            utterance.voice = preferredVoiceRef.current;
+            utterance.lang = preferredVoiceRef.current.lang;
+        } else {
+            utterance.lang = 'pt-BR';
+        }
+
+        utterance.rate = 0.8; // Slower speed
+        
+        utterance.onstart = () => {
+            addLog("Browser TTS Playing 🔊");
+            hasStarted = true;
+            onStart();
+        };
+
+        utterance.onend = () => {
+            addLog("Browser TTS Finished");
+            onEnd();
+        };
+
+        utterance.onerror = (e) => {
+            addLog(`Browser TTS Error: ${e.error}`);
+            if (!hasStarted) onStart();
+            onEnd();
+        };
+
+        window.speechSynthesis.speak(utterance);
+    };
+    // -----------------------
 
     audio.onplay = () => {
-        addLog("TTS Playing 🔊");
+        addLog("Google TTS Playing 🔊");
         hasStarted = true;
         onStart();
     };
 
     audio.onended = () => {
-        addLog("TTS Finished");
+        addLog("Google TTS Finished");
         onEnd();
     };
 
     audio.onerror = (e) => {
-        addLog(`TTS Error: ${e}`);
-        // Fallback to visual only
-        if (!hasStarted) onStart();
-        onEnd();
+        addLog(`Google TTS Error: [${e.type}]`);
+        fallbackToBrowserTTS();
     };
 
-    // 3. Play
+    // 3. Play Google TTS
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {
         playPromise.catch(error => {
-            addLog(`Blocked: ${error.message}`);
-            // If blocked, try to force visual at least
-            if (!hasStarted) onStart();
-            onEnd();
+            addLog(`Google TTS Blocked: ${error.message}`);
+            fallbackToBrowserTTS();
         });
     }
 
-    // Safety fallback still needed
+    // Safety fallback
     setTimeout(() => {
-        if (!hasStarted) {
-            addLog("Timeout (No Audio)");
-            hasStarted = true;
-            onStart();
+        if (!hasStarted && !fallbackTriggered) {
+            addLog("Timeout -> Trying Fallback");
+            fallbackToBrowserTTS();
+        } else if (!hasStarted && fallbackTriggered) {
+             addLog("Final Timeout -> Visuals Only");
+             hasStarted = true;
+             onStart();
         }
-    }, 1500); // Increased timeout for network fetch
+    }, 2000);
   };
 
   return (
