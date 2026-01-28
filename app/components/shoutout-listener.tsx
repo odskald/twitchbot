@@ -21,6 +21,8 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   const clientRef = useRef<tmi.Client | null>(null);
   const queueRef = useRef<ShoutoutMessage[]>([]);
   const isPlayingRef = useRef(false);
+  // Keep track of preferred voice for logging purposes (even if we use Google TTS now)
+  const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   const addLog = (msg: string) => {
       console.log(msg);
