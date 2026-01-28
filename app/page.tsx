@@ -48,11 +48,19 @@ export default async function Page() {
       {/* Live Chatters Section */}
       <section style={{ marginTop: 32 }}>
         <h3>Live Chatters (Connected to Chat)</h3>
-        {liveChatters.chatters.length === 0 ? (
+        {liveChatters.error ? (
+           <div style={{ padding: 16, background: "rgba(239, 68, 68, 0.1)", borderRadius: 8, border: "1px solid #b91c1c" }}>
+             <p style={{ margin: 0, color: "#f87171" }}>
+               <strong>Error:</strong> {liveChatters.error}
+             </p>
+             <p style={{ marginTop: 8, fontSize: 14, color: "#fca5a5" }}>
+               Please check <Link href="/settings" style={{ color: "#fff", textDecoration: "underline" }}>Settings</Link> to ensure the bot is connected.
+             </p>
+           </div>
+        ) : liveChatters.chatters.length === 0 ? (
           <div style={{ padding: 16, background: "rgba(255, 255, 255, 0.05)", borderRadius: 8 }}>
             <p style={{ margin: 0, color: "#a7abb9" }}>
-              No chatters detected or bot not authenticated. 
-              Ensure you have <Link href="/settings" style={{ color: "#7aa2f7" }}>connected the bot account</Link> in settings.
+              No chatters detected. (Channel is empty or offline)
             </p>
           </div>
         ) : (

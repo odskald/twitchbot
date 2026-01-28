@@ -186,8 +186,8 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
       count: data.total,
       chatters: data.data, // List of { user_id, user_login, user_name }
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to fetch chatters:", error);
-    return { count: 0, chatters: [] };
+    return { count: 0, chatters: [], error: `Internal Error: ${error.message}` };
   }
 }
