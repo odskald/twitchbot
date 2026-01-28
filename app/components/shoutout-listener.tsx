@@ -15,10 +15,31 @@ interface ShoutoutMessage {
 
 export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   const [currentShoutout, setCurrentShoutout] = useState<ShoutoutMessage | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  
   const clientRef = useRef<tmi.Client | null>(null);
   const queueRef = useRef<ShoutoutMessage[]>([]);
   const isPlayingRef = useRef(false);
-  const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  const addLog = (msg: string) => {
+      console.log(msg);
+      setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5 logs
+  };
+
+  const enableAudio = () => {
+      // Play a silent buffer to unlock AudioContext
+      const audio = new Audio("");
+      audio.play().then(() => {
+          addLog("Audio Context Unlocked ✅");
+          setAudioEnabled(true);
+      }).catch(e => {
+          addLog(`Unlock failed: ${e.message}`);
+          // Still set to true to try anyway
+          setAudioEnabled(true);
+      });
+  };
+
 
   useEffect(() => {
     const loadVoices = () => {
@@ -77,6 +98,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
         const id = tags.id || Math.random().toString();
         
         console.log(`[Shoutout] Detected: ${user} says ${content}`);
+        addLog(`Msg: ${user}`);
         
         // Add to queue
         queueRef.current.push({ user, message: content, id });
@@ -84,7 +106,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
       }
     });
 
-    client.connect().catch(console.error);
+    client.connect().then(() => addLog("Connected to Chat")).catch(e => addLog(`Chat Error: ${e}`));
     clientRef.current = client;
 
     return () => {
@@ -130,26 +152,28 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const encodedText = encodeURIComponent(safeText);
     
     // 2. Construct URL
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${encodedText}`;
+    // client=gtx is often more permissive than tw-ob
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=pt-BR&q=${encodedText}`;
     
+    addLog(`Playing TTS...`);
     const audio = new Audio(url);
     audio.volume = 1.0;
     
     let hasStarted = false;
 
     audio.onplay = () => {
-        console.log("[Audio] Playing started");
+        addLog("TTS Playing 🔊");
         hasStarted = true;
         onStart();
     };
 
     audio.onended = () => {
-        console.log("[Audio] Finished");
+        addLog("TTS Finished");
         onEnd();
     };
 
     audio.onerror = (e) => {
-        console.error("[Audio] Error:", e);
+        addLog(`TTS Error: ${e}`);
         // Fallback to visual only
         if (!hasStarted) onStart();
         onEnd();
@@ -160,7 +184,7 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     
     if (playPromise !== undefined) {
         playPromise.catch(error => {
-            console.error("[Audio] Playback failed (likely blocked):", error);
+            addLog(`Blocked: ${error.message}`);
             // If blocked, try to force visual at least
             if (!hasStarted) onStart();
             onEnd();
@@ -170,14 +194,12 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     // Safety fallback still needed
     setTimeout(() => {
         if (!hasStarted) {
-            console.warn("[Audio] Timeout waiting for start, forcing visuals");
+            addLog("Timeout (No Audio)");
             hasStarted = true;
             onStart();
         }
-    }, 1000);
+    }, 1500); // Increased timeout for network fetch
   };
-
-  if (!currentShoutout) return null;
 
   return (
     <>
@@ -185,7 +207,34 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
       
+      {/* Audio Enable Overlay */}
+      {!audioEnabled && (
+        <div 
+            onClick={enableAudio}
+            style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.8)', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 9999, cursor: 'pointer', flexDirection: 'column'
+            }}>
+            <div style={{ fontSize: '40px' }}>🔇 Click to Enable Audio</div>
+            <div style={{ marginTop: '10px', opacity: 0.7 }}>Required for TTS</div>
+        </div>
+      )}
+
+      {/* Debug Logs (Bottom Left) */}
       <div style={{
+          position: 'fixed', bottom: 10, left: 10,
+          background: 'rgba(0,0,0,0.5)', color: '#0f0',
+          padding: '5px', fontSize: '12px', fontFamily: 'monospace',
+          pointerEvents: 'none', borderRadius: '4px'
+      }}>
+          {logs.map((log, i) => <div key={i}>{log}</div>)}
+      </div>
+
+      {currentShoutout && (
+      <div style={{
+        position: 'fixed',
         position: 'fixed',
         top: '50%',
         left: '50%',
