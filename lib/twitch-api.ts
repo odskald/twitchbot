@@ -220,6 +220,11 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
 
           if (shouldUpdateTimestamp) {
             updateData.updatedAt = now;
+          } else if (dbUser) {
+            // CRITICAL: Prevent Prisma from auto-updating @updatedAt to now()
+            // by explicitly setting it to the previous value.
+            // This allows time to accumulate across multiple checks.
+            updateData.updatedAt = dbUser.updatedAt;
           }
 
           await prisma.user.upsert({
