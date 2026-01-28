@@ -88,10 +88,30 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     const utterance = new SpeechSynthesisUtterance(text);
     
     // Select Portuguese voice
-    const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find(v => v.lang.includes('pt') || v.lang.includes('PT'));
+    let voices = window.speechSynthesis.getVoices();
+    
+    // Retry getting voices if empty (common Chrome issue)
+    if (voices.length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+             voices = window.speechSynthesis.getVoices();
+        };
+    }
+
+    // Prioritize Brazilian Portuguese (pt-BR)
+    let ptVoice = voices.find(v => v.lang === 'pt-BR' || v.lang === 'pt_BR');
+    
+    // Fallback to any Portuguese
+    if (!ptVoice) {
+        ptVoice = voices.find(v => v.lang.toLowerCase().includes('pt'));
+    }
+
     if (ptVoice) {
+        console.log(`Using voice: ${ptVoice.name} (${ptVoice.lang})`);
         utterance.voice = ptVoice;
+        utterance.lang = ptVoice.lang;
+    } else {
+        console.warn("No specific Portuguese voice found. Setting lang to pt-BR.");
+        utterance.lang = 'pt-BR';
     }
     
     utterance.volume = 1;
