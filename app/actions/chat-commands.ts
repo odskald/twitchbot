@@ -3,8 +3,45 @@
 import prisma from '@/lib/db';
 import { sendChatMessage } from '@/lib/twitch-api';
 
-export async function processChatCommand(command: string, args: string[], userContext: { username: string; userId: string; isMod: boolean; isBroadcaster: boolean }) {
+export async function processChatCommand(
+  command: string, 
+  args: string[], 
+  userContext: { username: string; userId: string; isMod: boolean; isBroadcaster: boolean },
+  messageId?: string
+) {
   try {
+    // Deduplication Logic
+    if (messageId) {
+      try {
+        await prisma.processedCommand.create({
+          data: {
+            id: messageId,
+            command: command,
+            userId: userContext.userId
+          }
+        });
+        
+        // Cleanup old processed commands (1% chance to run)
+        if (Math.random() < 0.01) {
+            const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+            await prisma.processedCommand.deleteMany({
+                where: { createdAt: { lt: oneMinuteAgo } }
+            }).catch(err => console.error("Failed to cleanup processed commands:", err));
+        }
+
+      } catch (error: any) {
+        // If unique constraint failed, it's a duplicate
+        if (error.code === 'P2002') {
+          console.log(`[ChatCommand] Duplicate message detected: ${messageId}`);
+          return;
+        }
+        // Other errors, we log but proceed (fail-open) or return (fail-safe)
+        // Let's fail-safe to avoid spam
+        console.error(`[ChatCommand] Error checking deduplication:`, error);
+        return;
+      }
+    }
+
     const chatterName = userContext.username;
     const chatterId = userContext.userId;
     const lowerCommand = command.toLowerCase();
@@ -98,24 +135,22 @@ export async function processChatCommand(command: string, args: string[], userCo
                     }
                   }),
                   prisma.pointLedger.create({
-                     data: {
-                       userId: user.id,
-                       points: -item.cost,
-                       type: 'SPEND',
-                       reason: `Bought ${item.name}`
-                     }
+                    data: {
+                        userId: user.id,
+                        points: -item.cost,
+                        type: 'SPEND',
+                        reason: `Bought ${item.name}`
+                    }
                   })
                 ]);
-
-                await sendChatMessage(`@${chatterName} redeemed ${item.name} for ${item.cost} points! Balance: ${user.points - item.cost}.`);
+                
+                await sendChatMessage(`@${chatterName} redeemed ${item.name} for ${item.cost} points!`);
               }
             }
        }
     }
 
-    return { success: true };
-  } catch (err: any) {
-    console.error("Error processing command:", err);
-    return { success: false, error: err.message };
+  } catch (error) {
+    console.error("[ChatCommand] Error processing command:", error);
   }
 }

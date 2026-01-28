@@ -52,7 +52,7 @@ export function ChatListener({ channel }: ChatListenerProps) {
             userId: tags["user-id"] || "",
             isMod: tags.mod || false,
             isBroadcaster: tags.badges?.broadcaster === "1"
-        });
+        }, tags.id);
       }
     });
 

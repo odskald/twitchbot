@@ -105,3 +105,10 @@ model Redemption {
   user        User     @relation(fields: [userId], references: [id])
   item        ShopItem @relation(fields: [itemId], references: [id])
 }
+
+model ProcessedCommand {
+  id        String   @id
+  command   String
+  userId    String
+  createdAt DateTime @default(now())
+}
