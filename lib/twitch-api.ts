@@ -237,7 +237,6 @@ export async function getLiveChatters(): Promise<{ count: number; chatters: Chat
         }));
 
         // 3. Fetch Enriched Data (Points, Level, XP)
-        const userIds = enrichedChatters.map(c => c.user_id);
         const dbUsers = await prisma.user.findMany({
           where: { twitchId: { in: userIds } },
           select: { twitchId: true, points: true, level: true, xp: true }
