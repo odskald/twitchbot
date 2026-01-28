@@ -122,58 +122,59 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   };
 
   const speak = (text: string, onStart: () => void, onEnd: () => void) => {
-    if (!window.speechSynthesis) {
-        console.warn("TTS not supported");
-        onStart(); // Force visual show even if no TTS
-        onEnd();
-        return;
-    }
-
-    // Cancel any current speech
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
+    // New Implementation: Use Google Translate TTS via Audio Element
+    // This bypasses browser synthesis quirks and works better in OBS
     
-    if (preferredVoiceRef.current) {
-        utterance.voice = preferredVoiceRef.current;
-        utterance.lang = preferredVoiceRef.current.lang;
-    } else {
-        // Last resort fallback
-        utterance.lang = 'pt-BR';
-    }
+    // 1. Truncate text to 200 chars (Google API limit)
+    const safeText = text.substring(0, 200);
+    const encodedText = encodeURIComponent(safeText);
     
-    utterance.volume = 1;
-    utterance.rate = 0.8; // Slower speed
-    utterance.pitch = 1;
+    // 2. Construct URL
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${encodedText}`;
+    
+    const audio = new Audio(url);
+    audio.volume = 1.0;
     
     let hasStarted = false;
 
-    utterance.onstart = () => {
+    audio.onplay = () => {
+        console.log("[Audio] Playing started");
         hasStarted = true;
         onStart();
     };
 
-    utterance.onend = () => {
+    audio.onended = () => {
+        console.log("[Audio] Finished");
         onEnd();
     };
+
+    audio.onerror = (e) => {
+        console.error("[Audio] Error:", e);
+        // Fallback to visual only
+        if (!hasStarted) onStart();
+        onEnd();
+    };
+
+    // 3. Play
+    const playPromise = audio.play();
     
-    utterance.onerror = (e) => {
-        console.error("TTS Error", e);
-        // Ensure we don't stall the queue on error
-        if (!hasStarted) onStart(); 
-        onEnd();
-    };
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.error("[Audio] Playback failed (likely blocked):", error);
+            // If blocked, try to force visual at least
+            if (!hasStarted) onStart();
+            onEnd();
+        });
+    }
 
-    window.speechSynthesis.speak(utterance);
-
-    // Safety fallback: if onstart doesn't fire within 500ms (e.g. OBS audio blocked), force show visuals
+    // Safety fallback still needed
     setTimeout(() => {
         if (!hasStarted) {
-            console.warn("TTS onstart timed out, forcing visuals");
+            console.warn("[Audio] Timeout waiting for start, forcing visuals");
             hasStarted = true;
             onStart();
         }
-    }, 500);
+    }, 1000);
   };
 
   if (!currentShoutout) return null;
