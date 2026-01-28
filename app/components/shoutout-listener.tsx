@@ -17,7 +17,6 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   const [currentShoutout, setCurrentShoutout] = useState<ShoutoutMessage | null>(null);
   // Default to TRUE (Optimistic Autoplay). If blocked, we set to false to show overlay.
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [logs, setLogs] = useState<string[]>([]);
   
   const clientRef = useRef<tmi.Client | null>(null);
   const queueRef = useRef<ShoutoutMessage[]>([]);
@@ -39,7 +38,6 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
   }, []);
 
   const addLog = (msg: string) => {
-    setLogs(prev => [...prev.slice(-4), `[${new Date().toLocaleTimeString()}] ${msg}`]);
     console.log(`[ShoutoutDebug] ${msg}`);
   };
 
