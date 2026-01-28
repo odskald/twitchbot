@@ -86,8 +86,16 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Select Portuguese voice
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find(v => v.lang.includes('pt') || v.lang.includes('PT'));
+    if (ptVoice) {
+        utterance.voice = ptVoice;
+    }
+    
     utterance.volume = 1;
-    utterance.rate = 1;
+    utterance.rate = 0.8; // Slower speed
     utterance.pitch = 1;
     
     utterance.onend = () => {
