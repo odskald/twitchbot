@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import LeaderboardDisplay from "./leaderboard-display";
+import AutoRefresh from "@/app/components/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
