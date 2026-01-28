@@ -141,12 +141,15 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     isPlayingRef.current = true;
     const next = queueRef.current.shift();
     if (next) {
-      // Don't show visuals yet - wait for TTS start
+      // 1. Show Visuals IMMEDIATELY
+      setCurrentShoutout(next);
+
+      // 2. Play Audio (Async)
       speak(
         next.message, 
         () => {
-            // onStart: Show Visuals NOW
-            setCurrentShoutout(next);
+            // onStart: Audio started (Log only, visuals already up)
+            addLog("Audio Sync Start");
         },
         () => {
             // onEnd: Cleanup after delay
@@ -289,6 +292,14 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     };
 
     // Start Chain
+    // If Audio is explicitly disabled or blocked, skip directly to fallback/end
+    if (!audioEnabled) {
+         addLog("Audio Disabled -> Skipping TTS");
+         onStart();
+         onEnd();
+         return;
+    }
+
     playStreamElements();
 
     // Safety fallback timeout
@@ -297,11 +308,12 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
             addLog("Timeout -> Trying Browser Fallback");
             fallbackToBrowserTTS();
         } else if (!hasStarted && fallbackTriggered) {
-             addLog("Final Timeout -> Visuals Only");
+             addLog("Final Timeout -> Force Finish");
              hasStarted = true;
              onStart();
+             onEnd(); // Ensure queue clears
         }
-    }, 3500);
+    }, 5000); // Extended to 5s
   };
 
   return (
