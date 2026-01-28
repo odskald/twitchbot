@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 interface UserData {
   displayName: string | null;
   points: number;
@@ -14,63 +12,24 @@ interface LeaderboardDisplayProps {
   topLevel: UserData[];
 }
 
-export default function LeaderboardDisplay({ topPoints, topLevel }: LeaderboardDisplayProps) {
-  const [activeTab, setActiveTab] = useState<'points' | 'level'>('points');
-
-  const activeData = activeTab === 'points' ? topPoints : topLevel;
-
+function LeaderboardList({ title, data, type }: { title: string, data: UserData[], type: 'points' | 'level' }) {
   return (
-    <div style={{ padding: 16, width: 300, fontFamily: "system-ui, sans-serif" }}>
-      {/* Menu */}
-      <div style={{ 
-        display: "flex", 
-        gap: 8, 
-        marginBottom: 16, 
-        background: "rgba(0,0,0,0.6)", 
-        padding: 4, 
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.1)",
+    <div style={{ flex: 1, minWidth: 250 }}>
+      <h3 style={{ 
+        margin: "0 0 12px 0", 
+        color: "white", 
+        fontSize: 18, 
+        textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+        textAlign: "center",
+        background: "rgba(0,0,0,0.4)",
+        padding: "8px",
+        borderRadius: 8,
         backdropFilter: "blur(4px)"
       }}>
-        <button
-          onClick={() => setActiveTab('points')}
-          style={{
-            flex: 1,
-            background: activeTab === 'points' ? "#7c3aed" : "transparent",
-            color: "white",
-            border: "none",
-            borderRadius: 999,
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontSize: 14,
-            transition: "all 0.2s"
-          }}
-        >
-          Points
-        </button>
-        <button
-          onClick={() => setActiveTab('level')}
-          style={{
-            flex: 1,
-            background: activeTab === 'level' ? "#7c3aed" : "transparent",
-            color: "white",
-            border: "none",
-            borderRadius: 999,
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            fontSize: 14,
-            transition: "all 0.2s"
-          }}
-        >
-          Levels
-        </button>
-      </div>
-
-      {/* List */}
+        {title}
+      </h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {activeData.map((user, index) => (
+        {data.map((user, index) => (
           <div key={index} style={{
             display: "flex",
             alignItems: "center",
@@ -101,11 +60,11 @@ export default function LeaderboardDisplay({ topPoints, topLevel }: LeaderboardD
               {user.displayName || "Unknown"}
             </div>
             <div style={{ fontSize: 14, color: "#a5b4fc", fontWeight: "bold", marginLeft: 8 }}>
-              {activeTab === 'points' ? `${user.points} Pts` : `Lvl ${user.level}`}
+              {type === 'points' ? `${user.points} Pts` : `Lvl ${user.level}`}
             </div>
           </div>
         ))}
-        {activeData.length === 0 && (
+        {data.length === 0 && (
           <div style={{ 
             padding: 16, 
             textAlign: "center", 
@@ -117,6 +76,21 @@ export default function LeaderboardDisplay({ topPoints, topLevel }: LeaderboardD
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+export default function LeaderboardDisplay({ topPoints, topLevel }: LeaderboardDisplayProps) {
+  return (
+    <div style={{ 
+      padding: 16, 
+      fontFamily: "system-ui, sans-serif",
+      display: "flex",
+      gap: 24,
+      width: "fit-content"
+    }}>
+      <LeaderboardList title="🏆 Top Points" data={topPoints} type="points" />
+      <LeaderboardList title="⭐ Top Levels" data={topLevel} type="level" />
     </div>
   );
 }
