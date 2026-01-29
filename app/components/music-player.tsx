@@ -40,6 +40,7 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
 
+      // Command: !music <url>
       if (message.toLowerCase().startsWith('!music ')) {
         const parts = message.split(' ');
         if (parts.length > 1) {
@@ -53,6 +54,23 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
             addLog(`Invalid Link from ${tags['display-name']}`);
           }
         }
+      }
+
+      // Command: !skip
+      if (message.toLowerCase() === '!skip') {
+        // Check if mod or broadcaster
+        if (tags.mod || tags.badges?.broadcaster) {
+            addLog(`Skipping by ${tags['display-name']}`);
+            setCurrentVideoId(null); // Triggers next song
+        }
+      }
+
+      // Command: !queue
+      if (message.toLowerCase() === '!queue') {
+          // We can't reply easily from client-side without a bot token, 
+          // but we can log it or show it on screen briefly if we wanted.
+          // For now, let's just log it.
+          addLog(`Queue Length: ${queue.length}`);
       }
     });
 
