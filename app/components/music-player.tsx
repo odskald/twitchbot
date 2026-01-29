@@ -19,44 +19,11 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [player, setPlayer] = useState<any>(null);
   const [isApiReady, setIsApiReady] = useState(false);
-  
-  // Audio Handling State
-  const [isAudioLocked, setIsAudioLocked] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false); // Default false until click
+  const [logs, setLogs] = useState<string[]>([]);
 
   const addLog = (msg: string) => {
-    // Only console log to keep overlay clean
+    setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5
     console.log(`[Music] ${msg}`);
-  };
-
-  const unlockAudio = () => {
-      // Play a silent buffer to unlock AudioContext
-      const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-      const audio = new Audio(silentWav);
-      
-      audio.play().then(() => {
-          addLog("Audio Context Unlocked ✅");
-          setAudioEnabled(true);
-          setIsAudioLocked(false);
-          
-          // If player exists, unmute and play
-          if (player && player.unMute) {
-             player.unMute();
-             player.setVolume(100);
-             if (player.getPlayerState() !== 1) { // 1 = playing
-                 player.playVideo();
-             }
-          }
-      }).catch(e => {
-          addLog(`Unlock failed: ${e.message}`);
-          // Still try to clear the lock visually
-          setIsAudioLocked(false);
-      });
-  };
-
-  const handleAutoplayError = () => {
-      addLog("⚠️ Autoplay Blocked! Click overlay to enable.");
-      setIsAudioLocked(true);
   };
 
   // 1. Initialize TMI Client
@@ -139,13 +106,11 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
           'autoplay': 1,
           'controls': 0, // Hide controls for clean overlay
           'rel': 0,
-          'showinfo': 0,
-          'mute': 0 // Try to start unmuted
+          'showinfo': 0
         },
         events: {
           'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange,
-          'onError': onPlayerError
+          'onStateChange': onPlayerStateChange
         }
       });
       setPlayer(newPlayer);
@@ -153,23 +118,7 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
   }, [currentVideoId, isApiReady]);
 
   const onPlayerReady = (event: any) => {
-    event.target.setVolume(100);
-    // Try to play. If blocked, catch it.
-    try {
-        event.target.playVideo();
-    } catch (e) {
-        handleAutoplayError();
-    }
-    
-    // Check if it actually started playing after a moment
-    setTimeout(() => {
-        if (event.target.getPlayerState() !== 1 && event.target.getPlayerState() !== 3) { // Not playing or buffering
-             // It might be blocked or paused
-             if (!audioEnabled) {
-                 handleAutoplayError();
-             }
-        }
-    }, 1000);
+    event.target.playVideo();
   };
 
   const onPlayerStateChange = (event: any) => {
@@ -180,74 +129,11 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
     }
   };
 
-  const onPlayerError = (event: any) => {
-      console.error("YouTube Player Error:", event.data);
-      // 150 = restricted embed, etc.
-      if (event.data === 150 || event.data === 101) {
-          addLog("Video restricted from playback");
-          setCurrentVideoId(null);
-      }
-  };
-
   const extractVideoId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
   };
-
-  // --- BLOCKED OVERLAY ---
-  if (isAudioLocked) {
-    return (
-        <div 
-          onClick={unlockAudio}
-          style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: 'rgba(255, 0, 0, 0.8)',
-              color: 'white',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              cursor: 'pointer',
-              fontFamily: 'Arial, sans-serif',
-              textAlign: 'center'
-          }}
-        >
-            <h1 style={{ fontSize: '48px', margin: '0 0 20px 0' }}>⚠️ AUDIO BLOCKED</h1>
-            <p style={{ fontSize: '24px' }}>Click anywhere to enable music!</p>
-            <p style={{ fontSize: '16px', marginTop: '20px' }}>OBS Users: Interact with the source or check "Control Audio via OBS"</p>
-        </div>
-    );
-  }
-
-  // --- ENABLE BUTTON (Persistent if not enabled) ---
-  if (!audioEnabled) {
-      return (
-          <div 
-            onClick={unlockAudio}
-            style={{
-                position: 'fixed',
-                bottom: '10px',
-                right: '10px',
-                background: 'rgba(0,0,0,0.7)',
-                color: 'white',
-                padding: '10px',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                zIndex: 9999,
-                fontSize: '12px',
-                fontFamily: 'sans-serif'
-            }}
-          >
-              Click to Enable Audio 🔊
-          </div>
-      );
-  }
 
   return (
     <div style={{ 
@@ -283,6 +169,20 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
           </div>
         </div>
       )}
+
+      {/* Debug Logs (Optional, similar to TTS overlay) */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        padding: '10px',
+        color: 'rgba(255,255,255,0.5)',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        pointerEvents: 'none'
+      }}>
+        {logs.map((l, i) => <div key={i}>{l}</div>)}
+      </div>
 
       <style jsx>{`
         @keyframes fadeIn {
