@@ -54,11 +54,16 @@ export async function processChatCommand(
 
     // Command: !music / !musica (INSTANT PLAY)
     else if (lowerCommand === '!music' || lowerCommand === '!musica') {
-        const url = args.join(' ').trim();
-        const INSTANT_COST = 300;
+        if (!userContext.isMod && !userContext.isBroadcaster) {
+             await sendChatMessage(`@${chatterName}, apenas Mods podem usar !music para tocar imediatamente.`);
+             return;
+        }
 
+        const url = args.join(' ').trim();
+        // Mods don't pay for !music
+        
         if (!url) {
-            await sendChatMessage(`@${chatterName}, use !music <link> para tocar agora! (Custo: ${INSTANT_COST} pts)`);
+            await sendChatMessage(`@${chatterName}, use !music <link> para tocar agora!`);
         } else {
             // Validate YouTube Link
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -66,30 +71,9 @@ export async function processChatCommand(
             const videoId = (match && match[2].length === 11) ? match[2] : null;
 
             if (videoId) {
-                const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
-
-                if (!user || user.points < INSTANT_COST) {
-                     await sendChatMessage(`@${chatterName}, você precisa de ${INSTANT_COST} pontos para tocar agora!`);
-                } else {
-                     await prisma.$transaction([
-                        prisma.user.update({
-                          where: { twitchId: chatterId },
-                          data: { points: { decrement: INSTANT_COST } }
-                        }),
-                        prisma.pointLedger.create({
-                          data: {
-                              userId: user.id,
-                              points: -INSTANT_COST,
-                              type: 'SPEND',
-                              reason: `Instant Play: ${videoId}`
-                          }
-                        })
-                      ]);
-
-                     // Signal: [InstantPlay]
-                     await sendChatMessage(`[InstantPlay] ${videoId} ${chatterName}`);
-                     await sendChatMessage(`@${chatterName}, Trocando a música agora! (-${INSTANT_COST} pts) 🚨`);
-                }
+                 // Signal: [InstantPlay]
+                 await sendChatMessage(`[InstantPlay] ${videoId} ${chatterName}`);
+                 await sendChatMessage(`@${chatterName}, Trocando a música agora! 🚨`);
             } else {
                 await sendChatMessage(`@${chatterName}, Link inválido!`);
             }
@@ -151,28 +135,36 @@ export async function processChatCommand(
             const videoId = (match && match[2].length === 11) ? match[2] : null;
             
             if (videoId) {
-                const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
-                if (!user || user.points < QUEUE_ADD_COST) {
-                     await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_ADD_COST} pontos para adicionar à fila!`);
-                } else {
-                     await prisma.$transaction([
-                        prisma.user.update({
-                          where: { twitchId: chatterId },
-                          data: { points: { decrement: QUEUE_ADD_COST } }
-                        }),
-                        prisma.pointLedger.create({
-                          data: {
-                              userId: user.id,
-                              points: -QUEUE_ADD_COST,
-                              type: 'SPEND',
-                              reason: `Queue Add: ${videoId}`
-                          }
-                        })
-                      ]);
-                     
+                // Check if user is Mod or Broadcaster -> No Cost
+                if (userContext.isMod || userContext.isBroadcaster) {
                      // Signal: [QueueAdd]
                      await sendChatMessage(`[QueueAdd] ${videoId} ${chatterName}`);
-                     await sendChatMessage(`@${chatterName}, Adicionado à fila! (-${QUEUE_ADD_COST} pts) 🎵`);
+                     await sendChatMessage(`@${chatterName}, Adicionado à fila! (Mod/Broadcaster: Grátis) 🎵`);
+                } else {
+                    // Regular User -> Pay Cost
+                    const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
+                    if (!user || user.points < QUEUE_ADD_COST) {
+                        await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_ADD_COST} pontos para adicionar à fila!`);
+                    } else {
+                        await prisma.$transaction([
+                            prisma.user.update({
+                            where: { twitchId: chatterId },
+                            data: { points: { decrement: QUEUE_ADD_COST } }
+                            }),
+                            prisma.pointLedger.create({
+                            data: {
+                                userId: user.id,
+                                points: -QUEUE_ADD_COST,
+                                type: 'SPEND',
+                                reason: `Queue Add: ${videoId}`
+                            }
+                            })
+                        ]);
+                        
+                        // Signal: [QueueAdd]
+                        await sendChatMessage(`[QueueAdd] ${videoId} ${chatterName}`);
+                        await sendChatMessage(`@${chatterName}, Adicionado à fila! (-${QUEUE_ADD_COST} pts) 🎵`);
+                    }
                 }
             } else {
                 await sendChatMessage(`@${chatterName}, Link inválido! Para ver a fila, digite apenas !queue.`);
@@ -181,28 +173,38 @@ export async function processChatCommand(
          } else {
              // No URL -> View Queue
              const QUEUE_VIEW_COST = 10;
-             const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
-    
-             if (!user || user.points < QUEUE_VIEW_COST) {
-                 await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_VIEW_COST} pontos para ver a fila!`);
+             
+             // Check if user is Mod or Broadcaster -> No Cost
+             if (userContext.isMod || userContext.isBroadcaster) {
+                  // Signal: [QueueCheck]
+                  await sendChatMessage(`[QueueCheck] ${chatterName}`);
+                  await sendChatMessage(`@${chatterName}, Verifique a fila no overlay.`);
              } else {
-                 await prisma.$transaction([
-                    prisma.user.update({
-                      where: { twitchId: chatterId },
-                      data: { points: { decrement: QUEUE_VIEW_COST } }
-                    }),
-                    prisma.pointLedger.create({
-                      data: {
-                          userId: user.id,
-                          points: -QUEUE_VIEW_COST,
-                          type: 'SPEND',
-                          reason: `Checked Queue`
-                      }
-                    })
-                  ]);
-    
-                 // Signal: [QueueCheck]
-                 await sendChatMessage(`[QueueCheck] ${chatterName}`);
+                // Regular User -> Pay Cost
+                const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
+        
+                if (!user || user.points < QUEUE_VIEW_COST) {
+                    await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_VIEW_COST} pontos para ver a fila!`);
+                } else {
+                    await prisma.$transaction([
+                        prisma.user.update({
+                        where: { twitchId: chatterId },
+                        data: { points: { decrement: QUEUE_VIEW_COST } }
+                        }),
+                        prisma.pointLedger.create({
+                        data: {
+                            userId: user.id,
+                            points: -QUEUE_VIEW_COST,
+                            type: 'SPEND',
+                            reason: `Checked Queue`
+                        }
+                        })
+                    ]);
+                    
+                    // Signal: [QueueCheck]
+                    await sendChatMessage(`[QueueCheck] ${chatterName}`);
+                    await sendChatMessage(`@${chatterName}, Verifique a fila no overlay. (-${QUEUE_VIEW_COST} pts)`);
+                }
              }
          }
     }

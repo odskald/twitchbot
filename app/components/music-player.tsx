@@ -97,6 +97,10 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       if (message.startsWith('[Stop] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
            addLog(`Stopping...`);
            setCurrentVideoId(null);
+           setPlayer((p: any) => {
+               if (p && p.stopVideo) p.stopVideo();
+               return p;
+           });
       }
 
       // Signal: [Clear]
