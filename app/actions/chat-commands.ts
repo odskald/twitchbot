@@ -52,7 +52,8 @@ export async function processChatCommand(
         await sendChatMessage(msg);
     }
 
-    // Command: !pontos
+    // Command: !points / !pontos
+    else if (lowerCommand === '!points' || lowerCommand === '!pontos') {
         const user = await prisma.user.findUnique({
             where: { twitchId: chatterId }
         });
