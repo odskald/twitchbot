@@ -106,6 +106,38 @@ export async function processChatCommand(
         }
     }
 
+    // Command: !stop
+    else if (lowerCommand === '!stop') {
+        if (userContext.isMod || userContext.isBroadcaster) {
+            await sendChatMessage(`[Stop] ${chatterName}`);
+            await sendChatMessage(`@${chatterName}, Parando música. 🛑`);
+        }
+    }
+
+    // Command: !clear
+    else if (lowerCommand === '!clear') {
+        if (userContext.isMod || userContext.isBroadcaster) {
+            await sendChatMessage(`[Clear] ${chatterName}`);
+            await sendChatMessage(`@${chatterName}, Fila limpa! 🧹`);
+        }
+    }
+
+    // Command: !play
+    else if (lowerCommand === '!play') {
+        if (userContext.isMod || userContext.isBroadcaster) {
+            await sendChatMessage(`[Play] ${chatterName}`);
+            await sendChatMessage(`@${chatterName}, Play! ▶`);
+        }
+    }
+
+    // Command: !pause
+    else if (lowerCommand === '!pause') {
+        if (userContext.isMod || userContext.isBroadcaster) {
+            await sendChatMessage(`[Pause] ${chatterName}`);
+            await sendChatMessage(`@${chatterName}, Pausa! ⏸`);
+        }
+    }
+
     // Command: !queue (ADD or VIEW)
     else if (lowerCommand === '!queue') {
          const url = args.join(' ').trim();

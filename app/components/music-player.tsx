@@ -93,6 +93,36 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
           }
       }
 
+      // Signal: [Stop]
+      if (message.startsWith('[Stop] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+           addLog(`Stopping...`);
+           setCurrentVideoId(null);
+      }
+
+      // Signal: [Clear]
+      if (message.startsWith('[Clear] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+           addLog(`Queue Cleared`);
+           setQueue([]);
+      }
+
+      // Signal: [Play]
+      if (message.startsWith('[Play] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+           addLog(`Resuming...`);
+           setPlayer((p: any) => {
+               if (p && p.playVideo) p.playVideo();
+               return p;
+           });
+      }
+
+      // Signal: [Pause]
+      if (message.startsWith('[Pause] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+           addLog(`Pausing...`);
+           setPlayer((p: any) => {
+               if (p && p.pauseVideo) p.pauseVideo();
+               return p;
+           });
+      }
+
       // Command: !queue
       if (message.toLowerCase() === '!queue') {
           addLog(`Queue Length: ${queueRef.current.length}`);
@@ -185,58 +215,50 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
   };
 
   return (
-    <div style={{ 
-      width: '100vw', 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'flex-start',
-      justifyContent: 'flex-end', // Position at bottom left usually
-      padding: '20px'
-    }}>
-      {/* Visual Player Container */}
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000' }}>
+      <div id="player" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+      
+      {/* Controls Overlay */}
       <div style={{
-          background: 'rgba(0, 0, 0, 0.8)',
-          padding: '10px',
-          borderRadius: '10px',
-          boxShadow: '0 0 20px rgba(0,0,0,0.5)',
-          display: currentVideoId ? 'flex' : 'none', // Use display: none instead of unmounting
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'fadeIn 0.5s ease-out'
-        }}>
-          <div id="player"></div>
-          <div style={{
-            color: 'white',
-            fontFamily: 'Poppins, sans-serif',
-            marginTop: '10px',
-            fontSize: '14px',
-            textAlign: 'center'
-          }}>
-            Now Playing
-          </div>
-        </div>
-
-      {/* Debug Logs (Optional, similar to TTS overlay) */}
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        padding: '10px',
-        color: 'rgba(255,255,255,0.5)',
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        pointerEvents: 'none'
-      }}>
-        {logs.map((l, i) => <div key={i}>{l}</div>)}
+          position: 'absolute',
+          bottom: 20,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: 10,
+          opacity: 0.1,
+          transition: 'opacity 0.3s',
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.1'}
+      >
+          <button 
+            onClick={() => setCurrentVideoId(null)}
+            style={{
+                padding: '8px 16px',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontWeight: 'bold'
+            }}
+          >
+              STOP
+          </button>
       </div>
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      <div style={{ 
+        position: 'absolute', 
+        top: 10, 
+        left: 10, 
+        color: '#fff', 
+        fontFamily: 'monospace',
+        textShadow: '0 1px 2px #000'
+      }}>
+        <div>Queue: {queue.length}</div>
+        {logs.map((l, i) => <div key={i} style={{ fontSize: 12, opacity: 0.8 }}>{l}</div>)}
+      </div>
     </div>
   );
 }
