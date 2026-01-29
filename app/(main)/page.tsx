@@ -33,7 +33,23 @@ export default async function Page() {
     <div>
       <AutoRefresh intervalMs={5000} />
       <section>
-        <h2>Bot status</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+             <h2>Bot status</h2>
+             <Link href="/overlays" style={{
+                  display: 'inline-block',
+                  padding: '8px 16px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  boxShadow: '0 0 10px rgba(59, 130, 246, 0.4)',
+                  border: '1px solid #60a5fa'
+              }}>
+                Manage Overlays &rarr;
+              </Link>
+        </div>
         <div
           style={{
             display: "grid",
