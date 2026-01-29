@@ -75,23 +75,22 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
            addLog(`Queue Length: ${queueRef.current.length}`);
       }
 
-      // Command: !skip
-      if (message.toLowerCase() === '!skip') {
-        // Check if mod or broadcaster
-        if (tags.mod || tags.badges?.broadcaster) {
-            addLog(`Skipping by ${tags['display-name']}`);
-            
-            // Direct Queue Processing
-            const currentQueue = queueRef.current;
-            if (currentQueue.length > 0) {
-                const nextId = currentQueue[0];
-                setQueue(prev => prev.slice(1));
-                setCurrentVideoId(nextId);
-                addLog(`Playing Next: ${nextId}`);
-            } else {
-                setCurrentVideoId(null);
-            }
-        }
+      // Signal: [Skip] <requestedBy>
+      if (message.startsWith('[Skip] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+          const parts = message.split(' ');
+          const requester = parts[1] || 'Unknown';
+          addLog(`Skipping (Signal by ${requester})`);
+          
+          // Direct Queue Processing
+          const currentQueue = queueRef.current;
+          if (currentQueue.length > 0) {
+              const nextId = currentQueue[0];
+              setQueue(prev => prev.slice(1));
+              setCurrentVideoId(nextId);
+              addLog(`Playing Next: ${nextId}`);
+          } else {
+              setCurrentVideoId(null);
+          }
       }
 
       // Command: !queue

@@ -96,6 +96,16 @@ export async function processChatCommand(
         }
     }
 
+    // Command: !skip
+    else if (lowerCommand === '!skip') {
+        if (userContext.isMod || userContext.isBroadcaster) {
+            await sendChatMessage(`[Skip] ${chatterName}`);
+            await sendChatMessage(`@${chatterName}, Puf! Música pulada. 💨`);
+        } else {
+            await sendChatMessage(`@${chatterName}, apenas Mods podem pular músicas!`);
+        }
+    }
+
     // Command: !queue (ADD or VIEW)
     else if (lowerCommand === '!queue') {
          const url = args.join(' ').trim();
