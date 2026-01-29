@@ -48,86 +48,120 @@ export async function processChatCommand(
 
     // Command: !comandos / !commands
     if (lowerCommand === '!comandos' || lowerCommand === '!commands') {
-        const msg = `@${chatterName}, Comandos: !msg <texto> (100 pts), !music <link>, !pontos, !shop, !buy <item>.`;
+        const msg = `@${chatterName}, Comandos: !msg <texto> (100 pts), !queue <link> (100 pts), !music <link> (300 pts, Toca Agora!), !pontos, !shop.`;
         await sendChatMessage(msg);
     }
 
-    // Command: !music / !musica
+    // Command: !music / !musica (INSTANT PLAY)
     else if (lowerCommand === '!music' || lowerCommand === '!musica') {
         const url = args.join(' ').trim();
-        const MUSIC_COST = 150;
+        const INSTANT_COST = 300;
 
         if (!url) {
-            await sendChatMessage(`@${chatterName}, use !music <link_do_youtube> (Custo: ${MUSIC_COST} pts)`);
+            await sendChatMessage(`@${chatterName}, use !music <link> para tocar agora! (Custo: ${INSTANT_COST} pts)`);
         } else {
-            // Validate YouTube Link (same regex as frontend)
+            // Validate YouTube Link
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
             const match = url.match(regExp);
             const videoId = (match && match[2].length === 11) ? match[2] : null;
 
             if (videoId) {
-                // Check Points
-                const user = await prisma.user.findUnique({
-                    where: { twitchId: chatterId }
-                });
+                const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
 
-                if (!user || user.points < MUSIC_COST) {
-                     await sendChatMessage(`@${chatterName}, você precisa de ${MUSIC_COST} pontos! Você tem ${user?.points || 0}.`);
+                if (!user || user.points < INSTANT_COST) {
+                     await sendChatMessage(`@${chatterName}, você precisa de ${INSTANT_COST} pontos para tocar agora!`);
                 } else {
-                     // Deduct Points
                      await prisma.$transaction([
                         prisma.user.update({
                           where: { twitchId: chatterId },
-                          data: { points: { decrement: MUSIC_COST } }
+                          data: { points: { decrement: INSTANT_COST } }
                         }),
                         prisma.pointLedger.create({
                           data: {
                               userId: user.id,
-                              points: -MUSIC_COST,
+                              points: -INSTANT_COST,
                               type: 'SPEND',
-                              reason: `Requested Song: ${videoId}`
+                              reason: `Instant Play: ${videoId}`
                           }
                         })
                       ]);
 
-                     // Send Approval Signal to Chat (Client listens for this)
-                     // Format: [MusicRequest] <videoId> <requestedBy>
-                     await sendChatMessage(`[MusicRequest] ${videoId} ${chatterName}`);
-                     await sendChatMessage(`@${chatterName}, Música adicionada à fila! (-${MUSIC_COST} pts) 🎵`);
+                     // Signal: [InstantPlay]
+                     await sendChatMessage(`[InstantPlay] ${videoId} ${chatterName}`);
+                     await sendChatMessage(`@${chatterName}, Trocando a música agora! (-${INSTANT_COST} pts) 🚨`);
                 }
             } else {
-                await sendChatMessage(`@${chatterName}, Link inválido! Certifique-se que é um link do YouTube.`);
+                await sendChatMessage(`@${chatterName}, Link inválido!`);
             }
         }
     }
 
-    // Command: !queue
+    // Command: !queue (ADD or VIEW)
     else if (lowerCommand === '!queue') {
-         const QUEUE_COST = 20;
-         const user = await prisma.user.findUnique({
-             where: { twitchId: chatterId }
-         });
+         const url = args.join(' ').trim();
+         
+         // If URL provided -> Add to Queue
+         if (url) {
+             const QUEUE_ADD_COST = 100;
+             // Validate YouTube Link
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+            const match = url.match(regExp);
+            const videoId = (match && match[2].length === 11) ? match[2] : null;
+            
+            if (videoId) {
+                const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
+                if (!user || user.points < QUEUE_ADD_COST) {
+                     await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_ADD_COST} pontos para adicionar à fila!`);
+                } else {
+                     await prisma.$transaction([
+                        prisma.user.update({
+                          where: { twitchId: chatterId },
+                          data: { points: { decrement: QUEUE_ADD_COST } }
+                        }),
+                        prisma.pointLedger.create({
+                          data: {
+                              userId: user.id,
+                              points: -QUEUE_ADD_COST,
+                              type: 'SPEND',
+                              reason: `Queue Add: ${videoId}`
+                          }
+                        })
+                      ]);
+                     
+                     // Signal: [QueueAdd]
+                     await sendChatMessage(`[QueueAdd] ${videoId} ${chatterName}`);
+                     await sendChatMessage(`@${chatterName}, Adicionado à fila! (-${QUEUE_ADD_COST} pts) 🎵`);
+                }
+            } else {
+                await sendChatMessage(`@${chatterName}, Link inválido! Para ver a fila, digite apenas !queue.`);
+            }
 
-         if (!user || user.points < QUEUE_COST) {
-             await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_COST} pontos para ver a fila!`);
          } else {
-             await prisma.$transaction([
-                prisma.user.update({
-                  where: { twitchId: chatterId },
-                  data: { points: { decrement: QUEUE_COST } }
-                }),
-                prisma.pointLedger.create({
-                  data: {
-                      userId: user.id,
-                      points: -QUEUE_COST,
-                      type: 'SPEND',
-                      reason: `Checked Queue`
-                  }
-                })
-              ]);
-
-             // Signal Client
-             await sendChatMessage(`[QueueRequest] ${chatterName}`);
+             // No URL -> View Queue
+             const QUEUE_VIEW_COST = 10;
+             const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
+    
+             if (!user || user.points < QUEUE_VIEW_COST) {
+                 await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_VIEW_COST} pontos para ver a fila!`);
+             } else {
+                 await prisma.$transaction([
+                    prisma.user.update({
+                      where: { twitchId: chatterId },
+                      data: { points: { decrement: QUEUE_VIEW_COST } }
+                    }),
+                    prisma.pointLedger.create({
+                      data: {
+                          userId: user.id,
+                          points: -QUEUE_VIEW_COST,
+                          type: 'SPEND',
+                          reason: `Checked Queue`
+                      }
+                    })
+                  ]);
+    
+                 // Signal: [QueueCheck]
+                 await sendChatMessage(`[QueueCheck] ${chatterName}`);
+             }
          }
     }
 

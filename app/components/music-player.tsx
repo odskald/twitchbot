@@ -47,9 +47,19 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
 
-      // Signal: [MusicRequest] <videoId> <requestedBy>
-      // Only accept from Bot/Broadcaster/Mod to prevent spoofing
-      if (message.startsWith('[MusicRequest] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      // Signal: [InstantPlay] <videoId> <requestedBy>
+      if (message.startsWith('[InstantPlay] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+          const parts = message.split(' ');
+          if (parts.length >= 2) {
+              const videoId = parts[1];
+              const requester = parts[2] || 'Unknown';
+              addLog(`Instant Play: ${videoId} (${requester})`);
+              setCurrentVideoId(videoId); // Replaces current video immediately
+          }
+      }
+
+      // Signal: [QueueAdd] <videoId> <requestedBy>
+      if (message.startsWith('[QueueAdd] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
           const parts = message.split(' ');
           if (parts.length >= 2) {
               const videoId = parts[1];
@@ -59,8 +69,8 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
           }
       }
       
-      // Signal: [QueueRequest] <requestedBy>
-      if (message.startsWith('[QueueRequest] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      // Signal: [QueueCheck] <requestedBy>
+      if (message.startsWith('[QueueCheck] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
            // Log it on overlay
            addLog(`Queue Length: ${queueRef.current.length}`);
       }
