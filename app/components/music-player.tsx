@@ -21,6 +21,13 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
   const [isApiReady, setIsApiReady] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
 
+  const queueRef = useRef<string[]>([]);
+  
+  // Sync queue ref
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
   const addLog = (msg: string) => {
     setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5
     console.log(`[Music] ${msg}`);
@@ -61,16 +68,23 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
         // Check if mod or broadcaster
         if (tags.mod || tags.badges?.broadcaster) {
             addLog(`Skipping by ${tags['display-name']}`);
-            setCurrentVideoId(null); // Triggers next song
+            
+            // Direct Queue Processing
+            const currentQueue = queueRef.current;
+            if (currentQueue.length > 0) {
+                const nextId = currentQueue[0];
+                setQueue(prev => prev.slice(1));
+                setCurrentVideoId(nextId);
+                addLog(`Playing Next: ${nextId}`);
+            } else {
+                setCurrentVideoId(null);
+            }
         }
       }
 
       // Command: !queue
       if (message.toLowerCase() === '!queue') {
-          // We can't reply easily from client-side without a bot token, 
-          // but we can log it or show it on screen briefly if we wanted.
-          // For now, let's just log it.
-          addLog(`Queue Length: ${queue.length}`);
+          addLog(`Queue Length: ${queueRef.current.length}`);
       }
     });
 
