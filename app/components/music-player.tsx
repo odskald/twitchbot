@@ -47,20 +47,22 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
 
-      // Command: !music <url>
-      if (message.toLowerCase().startsWith('!music ')) {
-        const parts = message.split(' ');
-        if (parts.length > 1) {
-          const url = parts[1];
-          const videoId = extractVideoId(url);
-          
-          if (videoId) {
-            addLog(`Queueing: ${videoId} (${tags['display-name']})`);
-            setQueue(prev => [...prev, videoId]);
-          } else {
-            addLog(`Invalid Link from ${tags['display-name']}`);
+      // Signal: [MusicRequest] <videoId> <requestedBy>
+      // Only accept from Bot/Broadcaster/Mod to prevent spoofing
+      if (message.startsWith('[MusicRequest] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+          const parts = message.split(' ');
+          if (parts.length >= 2) {
+              const videoId = parts[1];
+              const requester = parts[2] || 'Unknown';
+              addLog(`Queueing: ${videoId} (${requester})`);
+              setQueue(prev => [...prev, videoId]);
           }
-        }
+      }
+      
+      // Signal: [QueueRequest] <requestedBy>
+      if (message.startsWith('[QueueRequest] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+           // Log it on overlay
+           addLog(`Queue Length: ${queueRef.current.length}`);
       }
 
       // Command: !skip

@@ -52,11 +52,13 @@ export async function processChatCommand(
         await sendChatMessage(msg);
     }
 
-    // Command: !music
-    else if (lowerCommand === '!music') {
+    // Command: !music / !musica
+    else if (lowerCommand === '!music' || lowerCommand === '!musica') {
         const url = args.join(' ').trim();
+        const MUSIC_COST = 150;
+
         if (!url) {
-            await sendChatMessage(`@${chatterName}, use !music <link_do_youtube>`);
+            await sendChatMessage(`@${chatterName}, use !music <link_do_youtube> (Custo: ${MUSIC_COST} pts)`);
         } else {
             // Validate YouTube Link (same regex as frontend)
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -64,11 +66,69 @@ export async function processChatCommand(
             const videoId = (match && match[2].length === 11) ? match[2] : null;
 
             if (videoId) {
-                await sendChatMessage(`@${chatterName}, Música adicionada à fila! 🎵`);
+                // Check Points
+                const user = await prisma.user.findUnique({
+                    where: { twitchId: chatterId }
+                });
+
+                if (!user || user.points < MUSIC_COST) {
+                     await sendChatMessage(`@${chatterName}, você precisa de ${MUSIC_COST} pontos! Você tem ${user?.points || 0}.`);
+                } else {
+                     // Deduct Points
+                     await prisma.$transaction([
+                        prisma.user.update({
+                          where: { twitchId: chatterId },
+                          data: { points: { decrement: MUSIC_COST } }
+                        }),
+                        prisma.pointLedger.create({
+                          data: {
+                              userId: user.id,
+                              points: -MUSIC_COST,
+                              type: 'SPEND',
+                              reason: `Requested Song: ${videoId}`
+                          }
+                        })
+                      ]);
+
+                     // Send Approval Signal to Chat (Client listens for this)
+                     // Format: [MusicRequest] <videoId> <requestedBy>
+                     await sendChatMessage(`[MusicRequest] ${videoId} ${chatterName}`);
+                     await sendChatMessage(`@${chatterName}, Música adicionada à fila! (-${MUSIC_COST} pts) 🎵`);
+                }
             } else {
                 await sendChatMessage(`@${chatterName}, Link inválido! Certifique-se que é um link do YouTube.`);
             }
         }
+    }
+
+    // Command: !queue
+    else if (lowerCommand === '!queue') {
+         const QUEUE_COST = 20;
+         const user = await prisma.user.findUnique({
+             where: { twitchId: chatterId }
+         });
+
+         if (!user || user.points < QUEUE_COST) {
+             await sendChatMessage(`@${chatterName}, você precisa de ${QUEUE_COST} pontos para ver a fila!`);
+         } else {
+             await prisma.$transaction([
+                prisma.user.update({
+                  where: { twitchId: chatterId },
+                  data: { points: { decrement: QUEUE_COST } }
+                }),
+                prisma.pointLedger.create({
+                  data: {
+                      userId: user.id,
+                      points: -QUEUE_COST,
+                      type: 'SPEND',
+                      reason: `Checked Queue`
+                  }
+                })
+              ]);
+
+             // Signal Client
+             await sendChatMessage(`[QueueRequest] ${chatterName}`);
+         }
     }
 
     // Command: !points / !pontos
