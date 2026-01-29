@@ -111,11 +111,17 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
 
   // 4. Initialize/Update Player
   useEffect(() => {
-    if (!currentVideoId || !isApiReady) return;
+    if (!isApiReady) return;
 
     if (player) {
-      player.loadVideoById(currentVideoId);
-    } else {
+      if (currentVideoId) {
+        player.loadVideoById(currentVideoId);
+      } else {
+        player.stopVideo(); // Stop if no video
+      }
+    } else if (currentVideoId) {
+       // Only create player if we have a video to play initially
+       // or we could create it empty, but let's stick to on-demand creation for first video
       const newPlayer = new window.YT.Player('player', {
         height: '360',
         width: '640',
@@ -164,13 +170,12 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       padding: '20px'
     }}>
       {/* Visual Player Container */}
-      {currentVideoId && (
-        <div style={{
+      <div style={{
           background: 'rgba(0, 0, 0, 0.8)',
           padding: '10px',
           borderRadius: '10px',
           boxShadow: '0 0 20px rgba(0,0,0,0.5)',
-          display: 'flex',
+          display: currentVideoId ? 'flex' : 'none', // Use display: none instead of unmounting
           flexDirection: 'column',
           alignItems: 'center',
           animation: 'fadeIn 0.5s ease-out'
@@ -186,7 +191,6 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
             Now Playing
           </div>
         </div>
-      )}
 
       {/* Debug Logs (Optional, similar to TTS overlay) */}
       <div style={{

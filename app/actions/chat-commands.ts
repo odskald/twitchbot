@@ -48,8 +48,27 @@ export async function processChatCommand(
 
     // Command: !comandos / !commands
     if (lowerCommand === '!comandos' || lowerCommand === '!commands') {
-        const msg = `@${chatterName}, Available commands: !msg <text> (100 pts), !music <yt_link>, !pontos, !shop, !buy <item>.`;
+        const msg = `@${chatterName}, Comandos: !msg <texto> (100 pts), !music <link>, !pontos, !shop, !buy <item>.`;
         await sendChatMessage(msg);
+    }
+
+    // Command: !music
+    else if (lowerCommand === '!music') {
+        const url = args.join(' ').trim();
+        if (!url) {
+            await sendChatMessage(`@${chatterName}, use !music <link_do_youtube>`);
+        } else {
+            // Validate YouTube Link (same regex as frontend)
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+            const match = url.match(regExp);
+            const videoId = (match && match[2].length === 11) ? match[2] : null;
+
+            if (videoId) {
+                await sendChatMessage(`@${chatterName}, Música adicionada à fila! 🎵`);
+            } else {
+                await sendChatMessage(`@${chatterName}, Link inválido! Certifique-se que é um link do YouTube.`);
+            }
+        }
     }
 
     // Command: !points / !pontos
