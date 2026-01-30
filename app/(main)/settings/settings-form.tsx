@@ -223,14 +223,6 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
        </div>
     </div>
 
-    <div style={{ marginTop: 16, padding: 16, border: "1px solid #24283b", borderRadius: 8, background: "#1a1b26" }}>
-      <h3 style={{ marginTop: 0, marginBottom: 12 }}>EventSub Webhooks</h3>
-      <p style={{ fontSize: 14, color: "#a7abb9", marginBottom: 16 }}>
-        Register the <code>channel.follow</code> webhook with Twitch. Ensure Base URL is correct and HTTPS (or ngrok).
-      </p>
-      <WebhookSetupButton />
-    </div>
-
     </div>
   );
 }

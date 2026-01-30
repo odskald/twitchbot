@@ -13,6 +13,8 @@ export default function FollowAlertPage() {
   const [currentAlert, setCurrentAlert] = useState<Alert | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
   // Poll for new alerts
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -50,8 +52,6 @@ export default function FollowAlertPage() {
     return () => clearInterval(interval);
   }, [currentAlert]);
 
-  if (!currentAlert) return null;
-
   return (
     <div style={{
       width: '100vw',
@@ -61,10 +61,16 @@ export default function FollowAlertPage() {
       justifyContent: 'center',
       overflow: 'hidden',
       background: 'transparent'
-    }}>
-      {/* Discord Notification Sound (Placeholder) */}
+    }}
+    onClick={() => {
+        // Unlock audio on any click
+        if (audioRef.current) audioRef.current.play().catch(() => {});
+    }}
+    >
+      {/* Discord Notification Sound */}
       <audio ref={audioRef} src="https://cdn.discordapp.com/attachments/1065005953055490048/1065005953055490048/discord_notification.mp3" />
       
+      {currentAlert && (
       <div className="alert-box" style={{
         position: 'relative',
         padding: '40px 60px',
@@ -102,6 +108,7 @@ export default function FollowAlertPage() {
           {currentAlert.message.replace(' is now following!', '')}
         </div>
       </div>
+      )}
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
