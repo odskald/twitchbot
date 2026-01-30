@@ -91,25 +91,22 @@ export async function processChatCommand(
              return;
         }
 
-        const url = args.join(' ').trim();
-        // Mods don't pay for !music
+        const input = args.join(' ').trim();
         
-        if (!url) {
-            await sendChatMessage(`@${chatterName}, use !music <link> para tocar agora!`);
+        if (!input) {
+            await sendChatMessage(`@${chatterName}, use !music <link/busca> para tocar agora!`);
         } else {
-            // Validate YouTube Link
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-            const match = url.match(regExp);
-            const videoId = (match && match[2].length === 11) ? match[2] : null;
+            // Use resolveVideo to support both Links and Search Terms
+            const video = await resolveVideo(input);
 
-            if (videoId) {
-                 console.log(`[ChatCommand] !music resolved: ${videoId}`);
+            if (video) {
+                 console.log(`[ChatCommand] !music resolved: ${video.id} (${video.title})`);
                  // Signal: [InstantPlay]
-                 await sendChatMessage(`[InstantPlay] ${videoId} ${chatterName}`);
-                 await sendChatMessage(`@${chatterName}, Trocando a música agora! 🚨`);
+                 await sendChatMessage(`[InstantPlay] ${video.id} ${chatterName}`);
+                 await sendChatMessage(`@${chatterName}, Trocando para: ${video.title} 🚨`);
             } else {
                 console.log(`[ChatCommand] !music invalid link/search`);
-                await sendChatMessage(`@${chatterName}, Link inválido!`);
+                await sendChatMessage(`@${chatterName}, Não encontrei nada para "${input}"!`);
             }
         }
     }
