@@ -187,25 +187,72 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       // Fix: Always authorize 'self' (the bot) so signals are accepted!
       const isAuthorized = isMod || isMe || self || (sender.toLowerCase() === channel.toLowerCase());
 
-      // 1. Client-Side !music Override (For direct links)
-      // This bypasses the server if it's a direct link, ensuring it works even if server actions fail.
-      if ((msg.startsWith('!music ') || msg.startsWith('!play ')) && isAuthorized) {
-          const args = msg.split(' ');
-          const input = args[1];
-          if (input) {
-             // Basic YouTube ID extraction regex
-             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-             const match = input.match(regExp);
-             const videoId = (match && match[2].length === 11) ? match[2] : null;
-             
-             if (videoId) {
-                 addLog(`[ClientOverride] Playing Link: ${videoId}`);
-                 setCurrentVideoId(videoId);
-                 setCurrentTitle("Loading..."); // Will be updated by Player API
-                 setCurrentRequester(sender);
-                 return; // handled
+      // 1. Client-Side Overrides (Bypass Server Signals for faster response)
+      if (isAuthorized) {
+        // !music / !play
+        if (msg.startsWith('!music ') || msg.startsWith('!play ')) {
+            const args = msg.split(' ');
+            const input = args[1];
+            if (input) {
+               const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+               const match = input.match(regExp);
+               const videoId = (match && match[2].length === 11) ? match[2] : null;
+               
+               if (videoId) {
+                   addLog(`[ClientOverride] Playing Link: ${videoId}`);
+                   setCurrentVideoId(videoId);
+                   setCurrentTitle("Loading..."); 
+                   setCurrentRequester(sender);
+                   return; 
+               }
+            }
+        }
+
+        // !skip / !next
+        if (msg === '!skip' || msg === '!next') {
+            addLog("[ClientOverride] Skip");
+            playNext();
+            return;
+        }
+
+        // !stop
+        if (msg === '!stop') {
+            addLog("[ClientOverride] Stop");
+            setQueue([]);
+            setCurrentVideoId(null);
+            setCurrentTitle("");
+            setCurrentRequester("");
+            if (playerRef.current) {
+                playerRef.current.destroy();
+                setPlayer(null);
+            }
+            return;
+        }
+
+        // !pause
+        if (msg === '!pause') {
+            addLog("[ClientOverride] Pause");
+            if (playerRef.current && playerRef.current.pauseVideo) {
+                playerRef.current.pauseVideo();
+            }
+            return;
+        }
+
+        // !play (resume)
+        if (msg === '!play' || msg === '!resume') {
+             addLog("[ClientOverride] Resume");
+             if (playerRef.current && playerRef.current.playVideo) {
+                 playerRef.current.playVideo();
              }
-          }
+             return;
+        }
+
+        // !queue (view)
+        if (msg === '!queue') {
+             // Just show log for now, as we can't reply to chat easily from client without auth token
+             // But the UI shows the queue anyway.
+             addLog(`[ClientOverride] Queue Check (${queueRef.current.length} items)`);
+        }
       }
 
       // 2. Signal Handling (Standard)
