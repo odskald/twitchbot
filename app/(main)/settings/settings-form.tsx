@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { updateGlobalConfig } from "@/app/actions/settings";
+import { useState } from "react";
 
 const initialState = {
   message: "",
@@ -29,6 +30,52 @@ function SubmitButton() {
     >
       {pending ? "Saving..." : "Save Settings"}
     </button>
+  );
+}
+
+function WebhookSetupButton() {
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const handleSetup = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/setup-webhooks");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+      const data = await res.json();
+      setMsg("✅ Success: " + data.message);
+    } catch (e: any) {
+      setMsg("❌ Error: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button 
+        onClick={handleSetup} 
+        disabled={loading}
+        type="button"
+        style={{
+          background: "#8b5cf6",
+          color: "white",
+          border: "none",
+          padding: "8px 16px",
+          borderRadius: 6,
+          cursor: loading ? "not-allowed" : "pointer",
+          fontWeight: 600,
+          fontSize: 14
+        }}
+      >
+        {loading ? "Registering..." : "Register Webhooks"}
+      </button>
+      {msg && <div style={{ marginTop: 8, fontSize: 13, color: msg.startsWith("✅") ? "#34d399" : "#f87171" }}>{msg}</div>}
+    </div>
   );
 }
 
@@ -118,6 +165,15 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
           Keep the <a href="/leaderboard" target="_blank" style={{ color: "#fff", textDecoration: "underline" }}>Leaderboard</a> open in a browser tab or OBS source for the bot to reply to chat.
        </div>
     </div>
+
+    <div style={{ marginTop: 16, padding: 16, border: "1px solid #24283b", borderRadius: 8, background: "#1a1b26" }}>
+      <h3 style={{ marginTop: 0, marginBottom: 12 }}>EventSub Webhooks</h3>
+      <p style={{ fontSize: 14, color: "#a7abb9", marginBottom: 16 }}>
+        Register the <code>channel.follow</code> webhook with Twitch. Ensure Base URL is correct and HTTPS (or ngrok).
+      </p>
+      <WebhookSetupButton />
+    </div>
+
     </div>
   );
 }
