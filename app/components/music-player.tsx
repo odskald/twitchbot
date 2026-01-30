@@ -22,11 +22,18 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
   const [logs, setLogs] = useState<string[]>([]);
 
   const queueRef = useRef<string[]>([]);
+  const playerRef = useRef<any>(null);
+  const [playerKey, setPlayerKey] = useState(0);
   
   // Sync queue ref
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  // Sync player ref
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
 
   const addLog = (msg: string) => {
     setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5
@@ -96,11 +103,14 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       // Signal: [Stop]
       if (message.startsWith('[Stop] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
            addLog(`Stopping...`);
+           
+           if (playerRef.current && playerRef.current.destroy) {
+               try { playerRef.current.destroy(); } catch (e) { console.error(e); }
+           }
+
+           setPlayer(null);
            setCurrentVideoId(null);
-           setPlayer((p: any) => {
-               if (p && p.stopVideo) p.stopVideo();
-               return p;
-           });
+           setPlayerKey(prev => prev + 1);
       }
 
       // Signal: [Clear]
@@ -220,7 +230,7 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000' }}>
-      <div id="player" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+      <div id="player" key={playerKey} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
       
       {/* Controls Overlay */}
       <div style={{
@@ -237,7 +247,14 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       onMouseLeave={(e) => e.currentTarget.style.opacity = '0.1'}
       >
           <button 
-            onClick={() => setCurrentVideoId(null)}
+            onClick={() => {
+                if (player && player.destroy) {
+                    try { player.destroy(); } catch(e) {}
+                }
+                setPlayer(null);
+                setCurrentVideoId(null);
+                setPlayerKey(prev => prev + 1);
+            }}
             style={{
                 padding: '8px 16px',
                 background: '#ef4444',
