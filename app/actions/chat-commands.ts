@@ -41,6 +41,7 @@ export async function processChatCommand(
   userContext: { username: string; userId: string; isMod: boolean; isBroadcaster: boolean },
   messageId?: string
 ) {
+  console.log(`[ServerAction] Processing: ${command} from ${userContext.username}`);
   try {
     // Deduplication Logic
     if (messageId) {
@@ -86,6 +87,7 @@ export async function processChatCommand(
 
     // Command: !music / !musica (INSTANT PLAY)
     else if (lowerCommand === '!music' || lowerCommand === '!musica') {
+        console.log(`[ServerAction] !music detected. Args: ${args.join(' ')}`);
         if (!userContext.isMod && !userContext.isBroadcaster) {
              await sendChatMessage(`@${chatterName}, apenas Mods podem usar !music para tocar imediatamente.`);
              return;
@@ -96,16 +98,17 @@ export async function processChatCommand(
         if (!input) {
             await sendChatMessage(`@${chatterName}, use !music <link/busca> para tocar agora!`);
         } else {
+            console.log(`[ServerAction] Resolving video for: ${input}`);
             // Use resolveVideo to support both Links and Search Terms
             const video = await resolveVideo(input);
 
             if (video) {
-                 console.log(`[ChatCommand] !music resolved: ${video.id} (${video.title})`);
+                 console.log(`[ServerAction] !music resolved: ${video.id} (${video.title})`);
                  // Signal: [InstantPlay]
                  await sendChatMessage(`[InstantPlay] ${video.id} ${chatterName}`);
                  await sendChatMessage(`@${chatterName}, Trocando para: ${video.title} 🚨`);
             } else {
-                console.log(`[ChatCommand] !music invalid link/search`);
+                console.log(`[ServerAction] !music invalid link/search`);
                 await sendChatMessage(`@${chatterName}, Não encontrei nada para "${input}"!`);
             }
         }
