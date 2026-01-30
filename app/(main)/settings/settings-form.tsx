@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { updateGlobalConfig } from "@/app/actions/settings";
+import { testFollowAlert } from "@/app/actions/debug";
 import { useState } from "react";
 
 const initialState = {
@@ -30,6 +31,51 @@ function SubmitButton() {
     >
       {pending ? "Saving..." : "Save Settings"}
     </button>
+  );
+}
+
+function TestAlertButton() {
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const handleTest = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const res = await testFollowAlert();
+      if (res.success) {
+        setMsg("✅ Alert Sent!");
+      } else {
+        setMsg("❌ Error: " + res.error);
+      }
+    } catch (e: any) {
+      setMsg("❌ Error: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button 
+        onClick={handleTest} 
+        disabled={loading}
+        type="button"
+        style={{
+          background: "#10b981",
+          color: "white",
+          border: "none",
+          padding: "8px 16px",
+          borderRadius: 6,
+          cursor: loading ? "not-allowed" : "pointer",
+          fontWeight: 600,
+          fontSize: 14
+        }}
+      >
+        {loading ? "Sending..." : "Test Follow Alert"}
+      </button>
+      {msg && <div style={{ marginTop: 8, fontSize: 13, color: msg.startsWith("✅") ? "#34d399" : "#f87171" }}>{msg}</div>}
+    </div>
   );
 }
 
