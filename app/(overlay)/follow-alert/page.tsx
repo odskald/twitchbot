@@ -67,8 +67,8 @@ export default function FollowAlertPage() {
         if (audioRef.current) audioRef.current.play().catch(() => {});
     }}
     >
-      {/* Discord Notification Sound */}
-      <audio ref={audioRef} src="https://cdn.discordapp.com/attachments/1065005953055490048/1065005953055490048/discord_notification.mp3" />
+      {/* Custom Alert Sound */}
+      <audio ref={audioRef} src="https://cdn.discordapp.com/attachments/1465273597068050596/1465276757690290206/level-up-06-370051.mp3?ex=697d2212&is=697bd092&hm=4af16b6421caded63c949cd68a30050445ea955bc8449e8fc7f047c552d7507c&" />
       
       {currentAlert && (
       <div className="alert-box" style={{
