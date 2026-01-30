@@ -2,6 +2,38 @@
 
 import prisma from '@/lib/db';
 import { sendChatMessage } from '@/lib/twitch-api';
+import yts from 'yt-search';
+
+// Helper to resolve video ID from URL or Search Term
+async function resolveVideo(input: string): Promise<{ id: string, title: string } | null> {
+    // 1. Check if it's a URL
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = input.match(regExp);
+    const videoId = (match && match[2].length === 11) ? match[2] : null;
+
+    if (videoId) {
+        try {
+            // Optional: Fetch title for better UX
+            const meta = await yts({ videoId });
+            return { id: videoId, title: meta.title || "Link" };
+        } catch (e) {
+             return { id: videoId, title: "Link" };
+        }
+    }
+
+    // 2. It's a search term
+    try {
+        const r = await yts(input);
+        const videos = r.videos;
+        if (videos.length > 0) {
+            return { id: videos[0].videoId, title: videos[0].title };
+        }
+    } catch (e) {
+        console.error("YouTube Search Error:", e);
+    }
+
+    return null;
+}
 
 export async function processChatCommand(
   command: string, 
@@ -124,22 +156,19 @@ export async function processChatCommand(
 
     // Command: !queue (ADD or VIEW)
     else if (lowerCommand === '!queue') {
-         const url = args.join(' ').trim();
+         const input = args.join(' ').trim();
          
-         // If URL provided -> Add to Queue
-         if (url) {
+         // If Input provided -> Add to Queue
+         if (input) {
              const QUEUE_ADD_COST = 100;
-             // Validate YouTube Link
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-            const match = url.match(regExp);
-            const videoId = (match && match[2].length === 11) ? match[2] : null;
+             const video = await resolveVideo(input);
             
-            if (videoId) {
+            if (video) {
                 // Check if user is Mod or Broadcaster -> No Cost
                 if (userContext.isMod || userContext.isBroadcaster) {
                      // Signal: [QueueAdd]
-                     await sendChatMessage(`[QueueAdd] ${videoId} ${chatterName}`);
-                     await sendChatMessage(`@${chatterName}, Adicionado à fila! (Mod/Broadcaster: Grátis) 🎵`);
+                     await sendChatMessage(`[QueueAdd] ${video.id} ${chatterName}`);
+                     await sendChatMessage(`@${chatterName}, Adicionado à fila: ${video.title} (Mod/Broadcaster: Grátis) 🎵`);
                 } else {
                     // Regular User -> Pay Cost
                     const user = await prisma.user.findUnique({ where: { twitchId: chatterId } });
@@ -156,18 +185,18 @@ export async function processChatCommand(
                                 userId: user.id,
                                 points: -QUEUE_ADD_COST,
                                 type: 'SPEND',
-                                reason: `Queue Add: ${videoId}`
+                                reason: `Queue Add: ${video.title} (${video.id})`
                             }
                             })
                         ]);
                         
                         // Signal: [QueueAdd]
-                        await sendChatMessage(`[QueueAdd] ${videoId} ${chatterName}`);
-                        await sendChatMessage(`@${chatterName}, Adicionado à fila! (-${QUEUE_ADD_COST} pts) 🎵`);
+                        await sendChatMessage(`[QueueAdd] ${video.id} ${chatterName}`);
+                        await sendChatMessage(`@${chatterName}, Adicionado à fila: ${video.title} (-${QUEUE_ADD_COST} pts) 🎵`);
                     }
                 }
             } else {
-                await sendChatMessage(`@${chatterName}, Link inválido! Para ver a fila, digite apenas !queue.`);
+                await sendChatMessage(`@${chatterName}, Não encontrei nada! Para ver a fila, digite apenas !queue.`);
             }
 
          } else {

@@ -147,6 +147,17 @@ export function SettingsForm({ dbConfig, envFlags }: { dbConfig: any, envFlags: 
         )}
       </div>
 
+      <div style={{ marginBottom: 32, padding: 16, border: "1px solid #24283b", borderRadius: 8, background: "#1a1b26" }}>
+        <h3 style={{ marginTop: 0, marginBottom: 12 }}>EventSub Webhooks</h3>
+        <p style={{ fontSize: 14, color: "#a7abb9", marginBottom: 16 }}>
+          Register subscriptions for channel.follow and other events.
+        </p>
+        <div style={{ display: "flex", gap: 12 }}>
+          <WebhookSetupButton />
+          <TestAlertButton />
+        </div>
+      </div>
+
       <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       
       {state?.message && (
