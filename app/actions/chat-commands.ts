@@ -104,8 +104,8 @@ export async function processChatCommand(
 
             if (video) {
                  console.log(`[ServerAction] !music resolved: ${video.id} (${video.title})`);
-                 // Signal: [InstantPlay]
-                 await sendChatMessage(`[InstantPlay] ${video.id} ${chatterName}`);
+                 // Signal: [InstantPlay] ID Requester Title
+                 await sendChatMessage(`[InstantPlay] ${video.id} ${chatterName} ${video.title}`);
                  await sendChatMessage(`@${chatterName}, Trocando para: ${video.title} 🚨`);
             } else {
                 console.log(`[ServerAction] !music invalid link/search`);
@@ -168,8 +168,8 @@ export async function processChatCommand(
             if (video) {
                 // Check if user is Mod or Broadcaster -> No Cost
                 if (userContext.isMod || userContext.isBroadcaster) {
-                     // Signal: [QueueAdd]
-                     await sendChatMessage(`[QueueAdd] ${video.id} ${chatterName}`);
+                     // Signal: [QueueAdd] ID Requester Title
+                     await sendChatMessage(`[QueueAdd] ${video.id} ${chatterName} ${video.title}`);
                      await sendChatMessage(`@${chatterName}, Adicionado à fila: ${video.title} (Mod/Broadcaster: Grátis) 🎵`);
                 } else {
                     // Regular User -> Pay Cost
@@ -192,8 +192,8 @@ export async function processChatCommand(
                             })
                         ]);
                         
-                        // Signal: [QueueAdd]
-                        await sendChatMessage(`[QueueAdd] ${video.id} ${chatterName}`);
+                        // Signal: [QueueAdd] ID Requester Title
+                        await sendChatMessage(`[QueueAdd] ${video.id} ${chatterName} ${video.title}`);
                         await sendChatMessage(`@${chatterName}, Adicionado à fila: ${video.title} (-${QUEUE_ADD_COST} pts) 🎵`);
                     }
                 }
