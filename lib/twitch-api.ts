@@ -75,6 +75,41 @@ async function getValidAccessToken(): Promise<string | null> {
 }
 
 /**
+ * Gets an App Access Token (Client Credentials Flow)
+ * Required for EventSub subscriptions (webhooks) that are not user-specific.
+ */
+export async function getAppAccessToken(): Promise<string | null> {
+  const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+  
+  if (!config?.twitchClientId || !config.twitchClientSecret) {
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://id.twitch.tv/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: config.twitchClientId,
+        client_secret: config.twitchClientSecret,
+        grant_type: "client_credentials",
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Failed to get app token", await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error("Error getting app token:", error);
+    return null;
+  }
+}
+
+/**
  * Resolves a username to a User ID using Helix.
  */
 export async function getTwitchUserId(username: string): Promise<string | null> {
