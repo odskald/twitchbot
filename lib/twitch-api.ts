@@ -136,6 +136,40 @@ export async function getTwitchUserId(username: string): Promise<string | null> 
 }
 
 /**
+ * Gets channel information (Game, Title) for a specific broadcaster ID.
+ */
+export async function getChannelInfo(broadcasterId: string): Promise<{ game_name: string; title: string } | null> {
+  const token = await getValidAccessToken();
+  const config = await getGlobalConfig();
+
+  if (!token || !config.twitchClientId) return null;
+
+  try {
+    const response = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${broadcasterId}`, {
+      headers: {
+        "Client-ID": config.twitchClientId,
+        "Authorization": `Bearer ${token}`,
+      },
+      next: { revalidate: 60 } // Cache for 60s
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    const info = data.data?.[0];
+    
+    if (!info) return null;
+
+    return {
+      game_name: info.game_name,
+      title: info.title
+    };
+  } catch (e) {
+    console.error("Failed to fetch channel info:", e);
+    return null;
+  }
+}
+
+/**
  * Fetches the current list of chatters for the configured channel.
  */
 export async function getLiveChatters(): Promise<{ count: number; chatters: Chatter[]; error?: string }> {

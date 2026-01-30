@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from '@/lib/db';
-import { sendChatMessage } from '@/lib/twitch-api';
+import { sendChatMessage, getTwitchUserId, getChannelInfo } from '@/lib/twitch-api';
 import yts from 'yt-search';
 
 // Helper to resolve video ID from URL or Search Term
@@ -83,6 +83,36 @@ export async function processChatCommand(
     if (lowerCommand === '!comandos' || lowerCommand === '!commands') {
         const msg = `@${chatterName}, Comandos: !msg <texto> (100 pts), !queue <link> (100 pts), !music <link> (300 pts, Toca Agora!), !pontos, !shop.`;
         await sendChatMessage(msg);
+    }
+
+    // Command: !shoutout / !so
+    else if (lowerCommand === '!shoutout' || lowerCommand === '!so') {
+        if (!userContext.isMod && !userContext.isBroadcaster) {
+             return; // Ignore non-mods
+        }
+
+        const targetUser = args[0]?.replace('@', '');
+        if (!targetUser) return;
+
+        try {
+            const userId = await getTwitchUserId(targetUser);
+            if (userId) {
+                const info = await getChannelInfo(userId);
+                const game = info?.game_name || "Unknown Game";
+                const title = info?.title || "";
+                
+                // 1. Chat Message
+                await sendChatMessage(`📢 Confira ${targetUser}! Último jogo: ${game}. Siga em twitch.tv/${targetUser} !`);
+
+                // 2. Overlay Signal (Hidden message pattern)
+                // We use a special prefix for the listener to pick up
+                await sendChatMessage(`[Shoutout] ${targetUser} playing ${game}`);
+            } else {
+                await sendChatMessage(`@${chatterName}, não encontrei o usuário ${targetUser}.`);
+            }
+        } catch (e) {
+            console.error("Error executing !shoutout:", e);
+        }
     }
 
     // Command: !music / !musica (INSTANT PLAY)
@@ -247,10 +277,10 @@ export async function processChatCommand(
         });
 
         if (user) {
-            const msg = `@${chatterName}, you have ${user.points} points (Lvl ${user.level}).`;
+            const msg = `@${chatterName}, você tem ${user.points} pontos (Nível ${user.level}).`;
             await sendChatMessage(msg);
         } else {
-            const msg = `@${chatterName}, you are not in the database yet. Stay awhile and listen!`;
+            const msg = `@${chatterName}, você ainda não está no banco de dados. Fique por aí e interaja!`;
             await sendChatMessage(msg);
         }
     }
@@ -263,14 +293,15 @@ export async function processChatCommand(
           orderBy: { cost: 'asc' }
         });
         
-        let msg = `@${chatterName}, use !msg <message> (100 pts) to send a highlighted message!`;
+        let msg = `@${chatterName}, use !msg <mensagem> (100 pts) para enviar uma mensagem destacada!`;
         
         if (items.length > 0) {
             const itemsList = items.map(i => `${i.name} (${i.cost} pts)`).join(', ');
-            msg += ` Other items: ${itemsList}. Use !buy <item_name>.`;
+            msg += ` Outros itens: ${itemsList}. Use !buy <nome_item>.`;
+            await sendChatMessage(msg);
+        } else {
+            await sendChatMessage(msg);
         }
-        
-        await sendChatMessage(msg);
     }
     
     // Command: !msg <message>

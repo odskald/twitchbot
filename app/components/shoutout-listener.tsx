@@ -116,21 +116,39 @@ export function ShoutoutListener({ channel }: ShoutoutListenerProps) {
     });
 
     client.on("message", (channel, tags, message, self) => {
-      // Look for the specific bot pattern: [100 pts] @User says: Message
-      // Regex updated to support all characters in username (non-greedy match before " says: ")
-      const match = message.match(/^\[100 pts\] @(.+?) says: (.*)$/);
+      // 1. Look for the specific bot pattern: [100 pts] @User says: Message
+      const matchMsg = message.match(/^\[100 pts\] @(.+?) says: (.*)$/);
       
-      if (match) {
-        const user = match[1];
-        const content = match[2];
+      if (matchMsg) {
+        const user = matchMsg[1];
+        const content = matchMsg[2];
         const id = tags.id || Math.random().toString();
         
-        console.log(`[Shoutout] Detected: ${user} says ${content}`);
+        console.log(`[Shoutout] Detected Msg: ${user} says ${content}`);
         addLog(`Msg: ${user}`);
         
-        // Add to queue
         queueRef.current.push({ user, message: content, id });
         processQueue();
+        return;
+      }
+
+      // 2. Look for Shoutout pattern: [Shoutout] TargetUser playing Game
+      const matchSo = message.match(/^\[Shoutout\] (.+?) playing (.*)$/);
+      
+      if (matchSo) {
+        const user = matchSo[1];
+        const game = matchSo[2];
+        const id = tags.id || Math.random().toString();
+
+        console.log(`[Shoutout] Detected SO: ${user} playing ${game}`);
+        addLog(`SO: ${user}`);
+
+        // Custom message for shoutout
+        const message = `Confira ${user}! Estava jogando ${game}.`;
+        
+        queueRef.current.push({ user, message, id });
+        processQueue();
+        return;
       }
     });
 
