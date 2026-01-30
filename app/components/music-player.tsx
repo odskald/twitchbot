@@ -16,32 +16,124 @@ declare global {
 }
 
 export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
+  // State
   const [queue, setQueue] = useState<string[]>([]);
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [player, setPlayer] = useState<any>(null);
-  const [isApiReady, setIsApiReady] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-
+  const [lastSignal, setLastSignal] = useState<string>("None");
+  
+  // Refs for closure access
   const queueRef = useRef<string[]>([]);
   const playerRef = useRef<any>(null);
-  const [playerKey, setPlayerKey] = useState(0);
-  
-  // Sync queue ref
-  useEffect(() => {
-    queueRef.current = queue;
-  }, [queue]);
 
-  // Sync player ref
-  useEffect(() => {
-    playerRef.current = player;
-  }, [player]);
+  // Sync Refs
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { playerRef.current = player; }, [player]);
 
+  // Logging Helper
   const addLog = (msg: string) => {
-    setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5
-    console.log(`[Music] ${msg}`);
+    const time = new Date().toLocaleTimeString().split(' ')[0];
+    const logLine = `[${time}] ${msg}`;
+    console.log(`[MusicPlayer] ${logLine}`);
+    setLogs(prev => [logLine, ...prev].slice(0, 10)); // Newest first, max 10
   };
 
-  // 1. Initialize TMI Client
+  // --- YouTube Player Logic ---
+
+  // Initialize YouTube API
+  useEffect(() => {
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      
+      window.onYouTubeIframeAPIReady = () => {
+        addLog("YouTube API Ready");
+        // We don't init player here immediately, we wait for a video ID
+      };
+    }
+  }, []);
+
+  // Handle Video Change
+  useEffect(() => {
+    if (!currentVideoId) return;
+
+    addLog(`Attempting to play: ${currentVideoId}`);
+
+    if (playerRef.current && playerRef.current.loadVideoById) {
+      // Player exists, just load new video
+      try {
+        playerRef.current.loadVideoById(currentVideoId);
+        playerRef.current.playVideo(); // Ensure play
+        addLog("Loaded video into existing player");
+      } catch (e) {
+        addLog("Error loading video: " + e);
+      }
+    } else {
+      // Create new player
+      if (window.YT && window.YT.Player) {
+        try {
+          new window.YT.Player('player-frame', {
+            height: '100%',
+            width: '100%',
+            videoId: currentVideoId,
+            playerVars: {
+              'autoplay': 1,
+              'controls': 0,
+              'disablekb': 1,
+              'fs': 0,
+              'rel': 0,
+            },
+            events: {
+              'onReady': (event: any) => {
+                addLog("Player Ready Event");
+                setPlayer(event.target);
+                event.target.playVideo();
+              },
+              'onStateChange': (event: any) => {
+                // 0 = Ended
+                if (event.data === 0) {
+                  playNext();
+                }
+              },
+              'onError': (event: any) => {
+                 addLog(`Player Error: ${event.data}`);
+                 playNext(); // Skip on error
+              }
+            },
+          });
+          addLog("Initialized new Player instance");
+        } catch (e) {
+          addLog("Error creating player: " + e);
+        }
+      } else {
+        addLog("YouTube API not yet loaded. Retrying in 1s...");
+        setTimeout(() => setCurrentVideoId(prev => prev), 1000); // Trigger re-render
+      }
+    }
+  }, [currentVideoId]);
+
+  const playNext = () => {
+    const next = queueRef.current[0];
+    if (next) {
+      addLog(`Auto-playing next: ${next}`);
+      setQueue(prev => prev.slice(1));
+      setCurrentVideoId(next);
+    } else {
+      addLog("Queue empty, stopping.");
+      setCurrentVideoId(null);
+      // Optional: Destroy player to show black screen/background
+      if (playerRef.current) {
+         playerRef.current.destroy();
+         setPlayer(null);
+      }
+    }
+  };
+
+  // --- Chat Listener Logic ---
+
   useEffect(() => {
     if (!channel) return;
 
@@ -50,255 +142,117 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       connection: { reconnect: true, secure: true }
     });
 
-    client.connect().catch(console.error);
+    client.connect().then(() => addLog(`Connected to chat: ${channel}`)).catch(e => addLog(`Chat Error: ${e}`));
 
     client.on('message', (channel, tags, message, self) => {
-      if (self) return;
-
-      const sender = tags.username || 'unknown';
-      // Normalize comparison for safety
-      const isAuthorized = tags.mod || 
-                           tags.badges?.broadcaster === "1" || 
-                           tags.username?.toLowerCase() === channel.toLowerCase() || 
-                           (botName && tags.username?.toLowerCase() === botName.toLowerCase());
-
-      // DEBUG: Log all messages that look like commands
-      if (message.startsWith('[') || message.startsWith('!')) {
-         console.log(`[Debug] Msg: "${message}" | Sender: ${sender} | Auth: ${isAuthorized} | BotName: ${botName}`);
-      }
-
-      // Signal: [InstantPlay] <videoId> <requestedBy>
-      if (message.startsWith('[InstantPlay]')) {
-          if (isAuthorized) {
-              const parts = message.split(' ');
-              if (parts.length >= 2) {
-                  const videoId = parts[1];
-                  const requester = parts[2] || 'Unknown';
-                  addLog(`Instant Play: ${videoId} (${requester})`);
-                  setCurrentVideoId(videoId); // Replaces current video immediately
-              }
-          } else {
-              addLog(`Ignored Cmd from ${sender} (No Auth)`);
-          }
-      }
-
-      // Signal: [QueueAdd] <videoId> <requestedBy>
-      if (message.startsWith('[QueueAdd]')) {
-          if (isAuthorized) {
-              const parts = message.split(' ');
-              if (parts.length >= 2) {
-                  const videoId = parts[1];
-                  const requester = parts[2] || 'Unknown';
-                  addLog(`Queueing: ${videoId} (${requester})`);
-                  setQueue(prev => [...prev, videoId]);
-              }
-          }
-      }
+      // NOTE: We REMOVED 'if (self) return' to allow bot signals to be heard!
       
-      // Signal: [QueueCheck] <requestedBy>
-      if (message.startsWith('[QueueCheck]') && isAuthorized) {
-           // Log it on overlay
-           addLog(`Queue Length: ${queueRef.current.length}`);
-      }
+      const msg = message.trim();
+      const sender = tags.username || 'unknown';
+      
+      // Authorization Check (Loose)
+      const isMod = tags.mod || tags.badges?.broadcaster === "1";
+      const isMe = tags.username?.toLowerCase() === botName?.toLowerCase(); // Bot itself
+      const isAuthorized = isMod || isMe || (sender.toLowerCase() === channel.toLowerCase());
 
-      // Signal: [Skip] <requestedBy>
-      if (message.startsWith('[Skip]') && isAuthorized) {
-          const parts = message.split(' ');
-          const requester = parts[1] || 'Unknown';
-          addLog(`Skipping (Signal by ${requester})`);
-          
-          // Direct Queue Processing
-          const currentQueue = queueRef.current;
-          if (currentQueue.length > 0) {
-              const nextId = currentQueue[0];
-              setQueue(prev => prev.slice(1));
-              setCurrentVideoId(nextId);
-              addLog(`Playing Next: ${nextId}`);
-          } else {
-              setCurrentVideoId(null);
+      // 1. Client-Side !music Override (For direct links)
+      // This bypasses the server if it's a direct link, ensuring it works even if server actions fail.
+      if ((msg.startsWith('!music ') || msg.startsWith('!play ')) && isAuthorized) {
+          const args = msg.split(' ');
+          const input = args[1];
+          if (input) {
+             // Basic YouTube ID extraction regex
+             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+             const match = input.match(regExp);
+             const videoId = (match && match[2].length === 11) ? match[2] : null;
+             
+             if (videoId) {
+                 addLog(`[ClientOverride] Playing Link: ${videoId}`);
+                 setCurrentVideoId(videoId);
+                 return; // handled
+             }
           }
       }
 
-      // Signal: [Stop]
-      if (message.startsWith('[Stop]') && isAuthorized) {
-           addLog(`Stopping...`);
-           
-           if (playerRef.current && playerRef.current.destroy) {
-               try { playerRef.current.destroy(); } catch (e) { console.error(e); }
-           }
+      // 2. Signal Handling (Standard)
+      if (msg.startsWith('[')) {
+          // Normalize spaces: "[InstantPlay]  ID" -> "[InstantPlay] ID"
+          const cleanMsg = msg.replace(/\s+/g, ' '); 
+          
+          if (cleanMsg.startsWith('[InstantPlay]')) {
+              if (!isAuthorized) { addLog(`Auth Fail: ${sender}`); return; }
+              const parts = cleanMsg.split(' ');
+              const videoId = parts[1];
+              if (videoId) {
+                  setLastSignal(`InstantPlay ${videoId}`);
+                  addLog(`Signal: InstantPlay ${videoId}`);
+                  setCurrentVideoId(videoId);
+              }
+          }
 
-           setPlayer(null);
-           setCurrentVideoId(null);
-           setPlayerKey(prev => prev + 1);
-      }
+          else if (cleanMsg.startsWith('[QueueAdd]')) {
+             if (!isAuthorized) { return; }
+             const parts = cleanMsg.split(' ');
+             const videoId = parts[1];
+             if (videoId) {
+                 setLastSignal(`QueueAdd ${videoId}`);
+                 addLog(`Signal: QueueAdd ${videoId}`);
+                 setQueue(prev => [...prev, videoId]);
+             }
+          }
 
-      // Signal: [Clear]
-      if (message.startsWith('[Clear]') && isAuthorized) {
-           addLog(`Queue Cleared`);
-           setQueue([]);
-      }
+          else if (cleanMsg.startsWith('[Skip]')) {
+              if (!isAuthorized) return;
+              addLog("Signal: Skip");
+              playNext();
+          }
 
-      // Signal: [Play]
-      if (message.startsWith('[Play]') && isAuthorized) {
-           addLog(`Resuming...`);
-           setPlayer((p: any) => {
-               if (p && p.playVideo) p.playVideo();
-               return p;
-           });
-      }
-
-      // Signal: [Pause]
-      if (message.startsWith('[Pause]') && isAuthorized) {
-           addLog(`Pausing...`);
-           setPlayer((p: any) => {
-               if (p && p.pauseVideo) p.pauseVideo();
-               return p;
-           });
-      }
-
-      // Command: !queue
-      if (message.toLowerCase() === '!queue') {
-          addLog(`Queue Length: ${queueRef.current.length}`);
+          else if (cleanMsg.startsWith('[Stop]')) {
+              if (!isAuthorized) return;
+              addLog("Signal: Stop");
+              setQueue([]);
+              setCurrentVideoId(null);
+              if (playerRef.current) {
+                  playerRef.current.destroy();
+                  setPlayer(null);
+              }
+          }
       }
     });
 
     return () => {
-      client.disconnect().catch(console.error);
+      client.disconnect();
     };
-  }, [channel]);
+  }, [channel, botName]);
 
-  // 2. Load YouTube IFrame API
-  useEffect(() => {
-    if (!window.YT) {
-      const tag = document.createElement('script');
-      tag.src = "https://www.youtube.com/iframe_api";
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-
-      window.onYouTubeIframeAPIReady = () => {
-        addLog("YouTube API Ready");
-        setIsApiReady(true);
-      };
-    } else {
-      setIsApiReady(true);
-    }
-  }, []);
-
-  // 3. Process Queue
-  useEffect(() => {
-    if (!isApiReady) return;
-
-    // If no video playing and queue has items
-    if (!currentVideoId && queue.length > 0) {
-      const nextId = queue[0];
-      setQueue(prev => prev.slice(1));
-      setCurrentVideoId(nextId);
-      addLog(`Playing: ${nextId}`);
-    }
-  }, [queue, currentVideoId, isApiReady]);
-
-  // 4. Initialize/Update Player
-  useEffect(() => {
-    if (!isApiReady) return;
-
-    if (player) {
-      if (currentVideoId) {
-        player.loadVideoById(currentVideoId);
-      } else {
-        player.stopVideo(); // Stop if no video
-      }
-    } else if (currentVideoId) {
-       // Only create player if we have a video to play initially
-       // or we could create it empty, but let's stick to on-demand creation for first video
-      const newPlayer = new window.YT.Player('player', {
-        height: '360',
-        width: '640',
-        videoId: currentVideoId,
-        playerVars: {
-          'autoplay': 1,
-          'controls': 0, // Hide controls for clean overlay
-          'rel': 0,
-          'showinfo': 0
-        },
-        events: {
-          'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange
-        }
-      });
-      setPlayer(newPlayer);
-    }
-  }, [currentVideoId, isApiReady]);
-
-  const onPlayerReady = (event: any) => {
-    event.target.playVideo();
-  };
-
-  const onPlayerStateChange = (event: any) => {
-    // 0 = Ended
-    if (event.data === 0) {
-      addLog("Video Ended");
-      setCurrentVideoId(null); // This will trigger the queue effect
-    }
-  };
-
-  const extractVideoId = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000' }}>
-      <div id="player" key={playerKey} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-      
-      {/* Controls Overlay */}
-      <div style={{
-          position: 'absolute',
-          bottom: 20,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: 10,
-          opacity: 0.1,
-          transition: 'opacity 0.3s',
-      }}
-      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.1'}
-      >
-          <button 
-            onClick={() => {
-                if (player && player.destroy) {
-                    try { player.destroy(); } catch(e) {}
-                }
-                setPlayer(null);
-                setCurrentVideoId(null);
-                setPlayerKey(prev => prev + 1);
-            }}
-            style={{
-                padding: '8px 16px',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontWeight: 'bold'
-            }}
-          >
-              STOP
-          </button>
-      </div>
+    <div className="w-full h-screen bg-black text-white overflow-hidden relative group">
+        {/* Video Container */}
+        <div id="player-frame" className="w-full h-full absolute inset-0 z-10" />
 
-      <div style={{ 
-        position: 'absolute', 
-        top: 10, 
-        left: 10, 
-        color: '#fff', 
-        fontFamily: 'monospace',
-        textShadow: '0 1px 2px #000'
-      }}>
-        <div>Queue: {queue.length}</div>
-        {logs.map((l, i) => <div key={i} style={{ fontSize: 12, opacity: 0.8 }}>{l}</div>)}
-      </div>
+        {/* Placeholder / Idle State */}
+        {!currentVideoId && (
+            <div className="absolute inset-0 flex items-center justify-center z-0">
+                <div className="text-center opacity-50">
+                    <h1 className="text-4xl font-bold mb-4">Music Overlay</h1>
+                    <p>Waiting for commands...</p>
+                    <p className="text-sm mt-2">!music &lt;link&gt; or !music &lt;name&gt;</p>
+                </div>
+            </div>
+        )}
+
+        {/* Debug Overlay (Always visible for now to help user) */}
+        <div className="absolute top-0 left-0 p-4 bg-black/80 z-50 text-xs font-mono w-full max-h-48 overflow-y-auto pointer-events-none">
+            <div className="font-bold text-green-400 border-b border-green-800 mb-1">
+                STATUS: {currentVideoId ? 'PLAYING' : 'IDLE'} | AUTH: {botName || '???'} | LAST: {lastSignal}
+            </div>
+            {logs.map((log, i) => (
+                <div key={i} className="opacity-80 border-b border-gray-800 py-0.5">
+                    {log}
+                </div>
+            ))}
+        </div>
     </div>
   );
 }
