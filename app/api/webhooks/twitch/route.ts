@@ -45,7 +45,23 @@ export async function POST(req: NextRequest) {
 
   // 5. Handle Notification
   if (messageType === 'notification') {
-    const { event } = JSON.parse(body);
+    const { subscription, event } = JSON.parse(body);
+    
+    // Handle Follows
+    if (subscription && subscription.type === 'channel.follow') {
+        const followerName = event.user_name;
+        console.log(`[Webhook] New follower: ${followerName}`);
+        
+        await prisma.alert.create({
+            data: {
+                type: 'follow',
+                message: `${followerName} is now following!`,
+                played: false
+            }
+        });
+
+        return new NextResponse('Follow processed', { status: 200 });
+    }
     
     // Check for chat message
     if (event && event.message && event.message.text) {

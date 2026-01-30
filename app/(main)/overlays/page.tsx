@@ -7,6 +7,7 @@ const overlays = [
   { name: 'Leaderboard', path: '/leaderboard', description: 'Shows top users by points/XP' },
   { name: 'Music Player', path: '/music', description: 'Video player for song requests' },
   { name: 'Shoutout', path: '/shoutout', description: 'Popup for shoutouts (!so)' },
+  { name: 'Follow Alert', path: '/follow-alert', description: 'Blue Neon Nordic Follow Alert' },
 ];
 
 export default function OverlaysPage() {

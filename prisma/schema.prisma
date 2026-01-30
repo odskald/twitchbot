@@ -15,6 +15,15 @@ enum TransactionType {
   SPEND
 }
 
+model Alert {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  mediaUrl  String?
+  played    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 model User {
   id           String         @id @default(cuid())
   twitchId     String         @unique
