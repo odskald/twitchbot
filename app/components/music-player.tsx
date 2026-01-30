@@ -310,7 +310,7 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
     <div className="w-full h-screen bg-black text-white overflow-hidden relative group font-sans">
         {/* Video Container (HIDDEN/INVISIBLE) */}
         {/* We keep it in DOM for playback, but hide it visually */}
-        <div id="player-frame" className="absolute top-0 left-0 w-1 h-1 opacity-0 pointer-events-none" />
+        <div id="player-frame" className="absolute top-0 left-0 w-1 h-1 opacity-5 pointer-events-none" />
 
         {/* Main Music UI */}
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-gradient-to-br from-purple-900 to-black p-8">
