@@ -217,6 +217,33 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
                   setPlayer(null);
               }
           }
+
+          else if (cleanMsg.startsWith('[Pause]')) {
+              if (!isAuthorized) return;
+              addLog("Signal: Pause");
+              if (playerRef.current && playerRef.current.pauseVideo) {
+                  playerRef.current.pauseVideo();
+              }
+          }
+
+          else if (cleanMsg.startsWith('[Play]')) {
+              if (!isAuthorized) return;
+              addLog("Signal: Play/Resume");
+              if (playerRef.current && playerRef.current.playVideo) {
+                  playerRef.current.playVideo();
+              }
+          }
+
+          else if (cleanMsg.startsWith('[QueueCheck]')) {
+              if (!isAuthorized) return;
+              const q = queueRef.current;
+              addLog(`Signal: QueueCheck (${q.length} items)`);
+              if (q.length > 0) {
+                  addLog(`Next: ${q.slice(0, 3).join(', ')}...`);
+              } else {
+                  addLog("Queue is empty.");
+              }
+          }
       }
     });
 

@@ -114,8 +114,8 @@ export async function processChatCommand(
         }
     }
 
-    // Command: !skip
-    else if (lowerCommand === '!skip') {
+    // Command: !skip / !next
+    else if (lowerCommand === '!skip' || lowerCommand === '!next') {
         if (userContext.isMod || userContext.isBroadcaster) {
             await sendChatMessage(`[Skip] ${chatterName}`);
             await sendChatMessage(`@${chatterName}, Puf! Música pulada. 💨`);
