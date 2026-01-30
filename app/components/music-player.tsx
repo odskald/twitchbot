@@ -55,27 +55,39 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
 
+      const sender = tags.username || 'unknown';
       const isAuthorized = tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase() || (botName && tags.username === botName.toLowerCase());
 
+      // DEBUG: Log all messages that look like commands
+      if (message.startsWith('[') || message.startsWith('!')) {
+         console.log(`[Debug] Msg: "${message}" | Sender: ${sender} | Auth: ${isAuthorized} | BotName: ${botName}`);
+      }
+
       // Signal: [InstantPlay] <videoId> <requestedBy>
-      if (message.startsWith('[InstantPlay] ') && isAuthorized) {
-          const parts = message.split(' ');
-          if (parts.length >= 2) {
-              const videoId = parts[1];
-              const requester = parts[2] || 'Unknown';
-              addLog(`Instant Play: ${videoId} (${requester})`);
-              setCurrentVideoId(videoId); // Replaces current video immediately
+      if (message.startsWith('[InstantPlay] ')) {
+          if (isAuthorized) {
+              const parts = message.split(' ');
+              if (parts.length >= 2) {
+                  const videoId = parts[1];
+                  const requester = parts[2] || 'Unknown';
+                  addLog(`Instant Play: ${videoId} (${requester})`);
+                  setCurrentVideoId(videoId); // Replaces current video immediately
+              }
+          } else {
+              addLog(`Ignored Cmd from ${sender} (No Auth)`);
           }
       }
 
       // Signal: [QueueAdd] <videoId> <requestedBy>
-      if (message.startsWith('[QueueAdd] ') && isAuthorized) {
-          const parts = message.split(' ');
-          if (parts.length >= 2) {
-              const videoId = parts[1];
-              const requester = parts[2] || 'Unknown';
-              addLog(`Queueing: ${videoId} (${requester})`);
-              setQueue(prev => [...prev, videoId]);
+      if (message.startsWith('[QueueAdd] ')) {
+          if (isAuthorized) {
+              const parts = message.split(' ');
+              if (parts.length >= 2) {
+                  const videoId = parts[1];
+                  const requester = parts[2] || 'Unknown';
+                  addLog(`Queueing: ${videoId} (${requester})`);
+                  setQueue(prev => [...prev, videoId]);
+              }
           }
       }
       
