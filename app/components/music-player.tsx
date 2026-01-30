@@ -56,7 +56,11 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       if (self) return;
 
       const sender = tags.username || 'unknown';
-      const isAuthorized = tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase() || (botName && tags.username === botName.toLowerCase());
+      // Normalize comparison for safety
+      const isAuthorized = tags.mod || 
+                           tags.badges?.broadcaster === "1" || 
+                           tags.username?.toLowerCase() === channel.toLowerCase() || 
+                           (botName && tags.username?.toLowerCase() === botName.toLowerCase());
 
       // DEBUG: Log all messages that look like commands
       if (message.startsWith('[') || message.startsWith('!')) {
@@ -64,7 +68,7 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       }
 
       // Signal: [InstantPlay] <videoId> <requestedBy>
-      if (message.startsWith('[InstantPlay] ')) {
+      if (message.startsWith('[InstantPlay]')) {
           if (isAuthorized) {
               const parts = message.split(' ');
               if (parts.length >= 2) {
@@ -79,7 +83,7 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       }
 
       // Signal: [QueueAdd] <videoId> <requestedBy>
-      if (message.startsWith('[QueueAdd] ')) {
+      if (message.startsWith('[QueueAdd]')) {
           if (isAuthorized) {
               const parts = message.split(' ');
               if (parts.length >= 2) {
@@ -92,13 +96,13 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       }
       
       // Signal: [QueueCheck] <requestedBy>
-      if (message.startsWith('[QueueCheck] ') && isAuthorized) {
+      if (message.startsWith('[QueueCheck]') && isAuthorized) {
            // Log it on overlay
            addLog(`Queue Length: ${queueRef.current.length}`);
       }
 
       // Signal: [Skip] <requestedBy>
-      if (message.startsWith('[Skip] ') && isAuthorized) {
+      if (message.startsWith('[Skip]') && isAuthorized) {
           const parts = message.split(' ');
           const requester = parts[1] || 'Unknown';
           addLog(`Skipping (Signal by ${requester})`);
@@ -116,7 +120,7 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       }
 
       // Signal: [Stop]
-      if (message.startsWith('[Stop] ') && isAuthorized) {
+      if (message.startsWith('[Stop]') && isAuthorized) {
            addLog(`Stopping...`);
            
            if (playerRef.current && playerRef.current.destroy) {
@@ -129,13 +133,13 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       }
 
       // Signal: [Clear]
-      if (message.startsWith('[Clear] ') && isAuthorized) {
+      if (message.startsWith('[Clear]') && isAuthorized) {
            addLog(`Queue Cleared`);
            setQueue([]);
       }
 
       // Signal: [Play]
-      if (message.startsWith('[Play] ') && isAuthorized) {
+      if (message.startsWith('[Play]') && isAuthorized) {
            addLog(`Resuming...`);
            setPlayer((p: any) => {
                if (p && p.playVideo) p.playVideo();
@@ -144,7 +148,7 @@ export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
       }
 
       // Signal: [Pause]
-      if (message.startsWith('[Pause] ') && isAuthorized) {
+      if (message.startsWith('[Pause]') && isAuthorized) {
            addLog(`Pausing...`);
            setPlayer((p: any) => {
                if (p && p.pauseVideo) p.pauseVideo();
