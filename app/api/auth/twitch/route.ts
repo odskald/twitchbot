@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     "moderator:read:chatters", // Required to see who is in chat
     "user:read:chat",         // General chat read access
     "user:write:chat",        // General chat write access (Helix)
+    "moderator:read:followers", // Required for channel.follow v2
     "chat:read",              // IRC chat read
     "chat:edit",              // IRC chat write
   ].join(" ");

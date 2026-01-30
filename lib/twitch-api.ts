@@ -387,42 +387,6 @@ export async function sendChatMessage(message: string): Promise<boolean> {
 }
 
 /**
- * Fetches an App Access Token (Client Credentials Flow) for EventSub subscriptions.
- * Note: This token is different from the User Access Token used for chat.
- */
-async function getAppAccessToken(): Promise<string | null> {
-  const config = await prisma.globalConfig.findUnique({ where: { id: "default" } });
-  
-  if (!config?.twitchClientId || !config?.twitchClientSecret) {
-    console.error("Missing Client ID or Secret for App Token");
-    return null;
-  }
-
-  try {
-    const response = await fetch("https://id.twitch.tv/oauth2/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: config.twitchClientId,
-        client_secret: config.twitchClientSecret,
-        grant_type: "client_credentials",
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("Failed to get App Access Token", await response.text());
-      return null;
-    }
-
-    const data = await response.json();
-    return data.access_token;
-  } catch (error) {
-    console.error("Error fetching App Access Token:", error);
-    return null;
-  }
-}
-
-/**
  * Subscribes to chat message events via EventSub Webhook.
  */
 export async function subscribeToChatEvents(baseUrl: string): Promise<{ success: boolean; error?: string }> {
