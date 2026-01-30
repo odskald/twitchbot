@@ -103,10 +103,12 @@ export async function processChatCommand(
             const videoId = (match && match[2].length === 11) ? match[2] : null;
 
             if (videoId) {
+                 console.log(`[ChatCommand] !music resolved: ${videoId}`);
                  // Signal: [InstantPlay]
                  await sendChatMessage(`[InstantPlay] ${videoId} ${chatterName}`);
                  await sendChatMessage(`@${chatterName}, Trocando a música agora! 🚨`);
             } else {
+                console.log(`[ChatCommand] !music invalid link/search`);
                 await sendChatMessage(`@${chatterName}, Link inválido!`);
             }
         }

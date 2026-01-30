@@ -376,9 +376,11 @@ export async function sendChatMessage(message: string): Promise<boolean> {
     });
 
     if (!response.ok) {
-        console.error("Failed to send chat message:", await response.text());
+        const errorText = await response.text();
+        console.error("Failed to send chat message:", errorText);
         return false;
     }
+    console.log(`[TwitchAPI] Sent message: "${message}" to ${targetChannelName}`);
     return true;
   } catch (error) {
     console.error("Error sending chat message:", error);
