@@ -5,6 +5,7 @@ import tmi from 'tmi.js';
 
 interface MusicPlayerProps {
   channel: string;
+  botName?: string;
 }
 
 declare global {
@@ -14,7 +15,7 @@ declare global {
   }
 }
 
-export default function MusicPlayer({ channel }: MusicPlayerProps) {
+export default function MusicPlayer({ channel, botName }: MusicPlayerProps) {
   const [queue, setQueue] = useState<string[]>([]);
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [player, setPlayer] = useState<any>(null);
@@ -54,8 +55,10 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
     client.on('message', (channel, tags, message, self) => {
       if (self) return;
 
+      const isAuthorized = tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase() || (botName && tags.username === botName.toLowerCase());
+
       // Signal: [InstantPlay] <videoId> <requestedBy>
-      if (message.startsWith('[InstantPlay] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[InstantPlay] ') && isAuthorized) {
           const parts = message.split(' ');
           if (parts.length >= 2) {
               const videoId = parts[1];
@@ -66,7 +69,7 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       }
 
       // Signal: [QueueAdd] <videoId> <requestedBy>
-      if (message.startsWith('[QueueAdd] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[QueueAdd] ') && isAuthorized) {
           const parts = message.split(' ');
           if (parts.length >= 2) {
               const videoId = parts[1];
@@ -77,13 +80,13 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       }
       
       // Signal: [QueueCheck] <requestedBy>
-      if (message.startsWith('[QueueCheck] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[QueueCheck] ') && isAuthorized) {
            // Log it on overlay
            addLog(`Queue Length: ${queueRef.current.length}`);
       }
 
       // Signal: [Skip] <requestedBy>
-      if (message.startsWith('[Skip] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[Skip] ') && isAuthorized) {
           const parts = message.split(' ');
           const requester = parts[1] || 'Unknown';
           addLog(`Skipping (Signal by ${requester})`);
@@ -101,7 +104,7 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       }
 
       // Signal: [Stop]
-      if (message.startsWith('[Stop] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[Stop] ') && isAuthorized) {
            addLog(`Stopping...`);
            
            if (playerRef.current && playerRef.current.destroy) {
@@ -114,13 +117,13 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       }
 
       // Signal: [Clear]
-      if (message.startsWith('[Clear] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[Clear] ') && isAuthorized) {
            addLog(`Queue Cleared`);
            setQueue([]);
       }
 
       // Signal: [Play]
-      if (message.startsWith('[Play] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[Play] ') && isAuthorized) {
            addLog(`Resuming...`);
            setPlayer((p: any) => {
                if (p && p.playVideo) p.playVideo();
@@ -129,7 +132,7 @@ export default function MusicPlayer({ channel }: MusicPlayerProps) {
       }
 
       // Signal: [Pause]
-      if (message.startsWith('[Pause] ') && (tags.mod || tags.badges?.broadcaster || tags.username === channel.toLowerCase())) {
+      if (message.startsWith('[Pause] ') && isAuthorized) {
            addLog(`Pausing...`);
            setPlayer((p: any) => {
                if (p && p.pauseVideo) p.pauseVideo();
